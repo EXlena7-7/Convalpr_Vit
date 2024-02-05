@@ -36,7 +36,7 @@ def main_demo(args):
         start = timer()
         frame_w_preds = detector_patente.draw_bboxes(
             frame, bboxes, mostrar_score=True)
-        print(frame_w_preds)
+        # print(frame_w_preds)
         end = timer()
         # Tiempo de inferencia
         exec_time = end - start
@@ -45,8 +45,8 @@ def main_demo(args):
             display_bench = f'ms: {exec_time:.4f} FPS: {fps:.0f}'
             fontScale = 1.5
             # cv2.putText(img, "Number Plate", (x,y-5), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255, 0, 255), 2)
-            cv2.putText("Number Plate", frame_w_preds, display_bench, (5, 45), cv2.FONT_HERSHEY_SIMPLEX,
-                        fontScale, (10, 140, 10), 4)
+            # cv2.putText("Number Plate", frame_w_preds, display_bench, (5, 45), cv2.FONT_HERSHEY_SIMPLEX,
+            #             fontScale, (10, 140, 10), 4)
         elif args.mostrar_benchmark:
             print(f'Inferencia\tms: {exec_time:.5f}\t', end='')
             print(f'FPS: {fps:.0f}')

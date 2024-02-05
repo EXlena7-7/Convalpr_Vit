@@ -1,3 +1,7 @@
 .vs/
 db/plates.db
 alpr/__pycache__/
+env
+virtualenv
+__pycache__
+**/__pycache__
