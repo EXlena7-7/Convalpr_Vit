@@ -1,4 +1,8 @@
 import os
+from typing import Callable
+import numpy as np 
+if not os.path.exists('plates'):
+       os.makedirs('plates')
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 from alpr.detector import PlateDetector
 import cv2

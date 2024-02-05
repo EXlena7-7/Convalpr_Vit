@@ -13,7 +13,7 @@ video:
 
     # Imagen en disco
     # (usar reconocedor_automatico.py)
-    fuente: './assets/sample.mp4'
+    fuente: './assets/trafico.mp4'
 
     # Cada cuantos Frames hacer inferencia
     # No se aplica si --demo
