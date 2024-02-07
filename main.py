@@ -1,63 +1,68 @@
-from fastapi import FastAPI, Response, UploadFile, File
-from starlette.requests import Request
-from fastapi.responses import StreamingResponse
-from vidgear.gears import VideoGear
 import os
+# Mostrar solo errores de TensorFlow
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+# Desabilitar GPU ( correr en CPU )
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 import sys
+from fastapi import FastAPI, Response, UploadFile, File
+from fastapi.responses import StreamingResponse
+from starlette.requests import Request
+import asyncio
+
+from vidgear.gears import VideoGear
+
 from typing import Callable
 import numpy as np 
 if not os.path.exists('plates'):
        os.makedirs('plates')
 os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 import time
-# Mostrar solo errores de TensorFlow
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-# Desabilitar GPU ( correr en CPU )
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 from alpr.alpr import ALPR
 from argparse import ArgumentParser
 import yaml
 import logging
 from timeit import default_timer as timer
 import cv2
-# import pytesseract
+import pytesseract
 import tempfile
 from datetime import datetime
 fechaActual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
-# from watchdog.observers import Observer
-# from watchdog.events import FileSystemEventHandler
-import asyncio
+import ffmpeg
 from PIL import Image
-# pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract'
-# arrayReconocidos = [];
-# class ImageEventHandler(FileSystemEventHandler):
 
-#     image_path = os.path.join(os.path.dirname(__file__), 'plates')
+
+pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract'
+arrayReconocidos = [];
+class ImageEventHandler(FileSystemEventHandler):
+
+    image_path = os.path.join(os.path.dirname(__file__), 'plates')
     
-#     def on_created(self, event):
-#         if not event.is_directory:
-#             # Apply OCR to the new image
-#             image_path = event.src_path
-#             image = cv2.imread(image_path)
-#             text = pytesseract.image_to_string(image, lang='spa')
-#             #print(text, f"OCR Result: {text}")
+    def on_created(self, event):
+        if not event.is_directory:
+            # Apply OCR to the new image
+            image_path = event.src_path
+            image = cv2.imread(image_path)
+            text = pytesseract.image_to_string(image, lang='spa')
+            #print(text, f"OCR Result: {text}")
             
-# def on_created(src_path: str):
-#         # Apply OCR to the new image
-#         print(src_path)
-#         image = cv2.imread(src_path)
-#         text = pytesseract.image_to_string(image, lang='spa')
-#         #print(text, f"OCR Result: {text}")
+def on_created(src_path: str):
+        # Apply OCR to the new image
+        print(src_path)
+        image = cv2.imread(src_path)
+        # text = pytesseract.image_to_string(image, lang='spa')
+        #print(text, f"OCR Result: {text}")
 
-# def save_temp_file(file: bytes, callback: Callable[[str], any]):
-#     with tempfile.NamedTemporaryFile(delete=True) as temp:
-#         data = file
-#         temp.write(data)
-#         temp_path = temp.name
-#         print(temp_path)
-#         return callback(temp_path)
+def save_temp_file(file: bytes, callback: Callable[[str], any]):
+    with tempfile.NamedTemporaryFile(delete=True) as temp:
+        data = file
+        temp.write(data)
+        temp_path = temp.name
+        print(temp_path)
+        return callback(temp_path)
 
 
 logging.basicConfig()
@@ -65,20 +70,20 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-# def read_image(path: str):
-#     #img = Image.open(path).convert("1")
-#     img = cv2.imread(path, cv2.IMREAD_GRAYSCALE) 
-#     cv2.dilate(img, (5, 5), img)
-#     text = pytesseract.image_to_string(img)
-#     if( text == ""):
-#         return False
+def read_image(path: str):
+    #img = Image.open(path).convert("1")
+    img = cv2.imread(path, cv2.IMREAD_GRAYSCALE) 
+    cv2.dilate(img, (5, 5), img)
+    text = pytesseract.image_to_string(img)
+    if( text == ""):
+        return False
     
-#     exist = text in arrayReconocidos
-#     if( not exist ):
-#         arrayReconocidos.append(text)
-#     return not exist
-    #return text;
-   # text = pytesseract.image_to_string(img, lang='eng')
+    exist = text in arrayReconocidos
+    if( not exist ):
+        arrayReconocidos.append(text)
+    return not exist
+    return text;
+#    text = pytesseract.image_to_string(img, lang='eng')
     
 app = FastAPI()
 
@@ -93,15 +98,14 @@ async def gen_frames(cfg, demo=True, benchmark=True, save_vid=False):
     is_img = cv2.haveImageReader(video_path)  # que hace? is_img
     cv2_wait = 0 if is_img else 1
     logger.info(f'Se va analizar la fuente: {video_path}')
-    # frame_id = 0
-    # observer = Observer()
-    # observer.schedule(ImageEventHandler(), path='plates', recursive=False)
-    # observer.daemon = True
-    # observer.start()
-    if save_vid:
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) + 0.5)
-        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) + 0.5)
-        size = (width, height)
+    observer = Observer()
+    observer.schedule(ImageEventHandler(), path='plates', recursive=False)
+    observer.daemon = True
+    observer.start()
+    # if save_vid:
+    #     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) + 0.5)
+    #     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) + 0.5)
+    #     size = (width, height)
         # fourcc = cv2.VideoWriter_fourcc(*'XVID')
         # out = cv2.VideoWriter('alpr-result.avi', fourcc, 20.0, size)
     # Cada cuantos frames hacer inferencia
@@ -112,7 +116,7 @@ async def gen_frames(cfg, demo=True, benchmark=True, save_vid=False):
     count = 1
 
     try:
-        stream = VideoGear(source='./assets/trafico.mp4').start()
+        stream = VideoGear(source='rtsp://admin:abc123**@192.168.7.136').start()
         
         while True:
             ret, frame = cap.read()
@@ -120,7 +124,18 @@ async def gen_frames(cfg, demo=True, benchmark=True, save_vid=False):
             frame = stream.read()
             if ret is False:
                 break  
+                
+                        # Reduce video quality using ffmpeg-python
+            (
+                ffmpeg
+                .input('pipe:', format='rawvideo', pix_fmt='rgb24', s='{}x{}'.format(*frame.shape[1::-1]))
+                .output('pipe:', format='rawvideo', pix_fmt='rgb24', vcodec='libx264', crf=24)
+                .overwrite_output()
+                .run_async(pipe_stdin=True, pipe_stdout=True)
+            )
+            
             if demo:
+            
                 plate_foto, total_time = alpr.mostrar_predicts(frame)
              
             out_boxes, __, _, num_boxes = alpr.bboxes
@@ -142,17 +157,15 @@ async def gen_frames(cfg, demo=True, benchmark=True, save_vid=False):
             resized_frame = cv2.resize(frame, (new_width, new_height), interpolation = cv2.INTER_AREA)
             
             _, buffer = cv2.imencode('.jpg', resized_frame)
-            frame = buffer.tobytes()
+            resized_frame = buffer.tobytes()
             
             
             yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+                   b'Content-Type: image/jpeg\r\n\r\n' + resized_frame + b'\r\n')
     finally:
         stream.stop()
 
         # frame_id += 1
-
-
 
 
 if __name__ == '__main__':
