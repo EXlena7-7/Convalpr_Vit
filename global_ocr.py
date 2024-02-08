@@ -2,7 +2,7 @@ import cv2
 import easyocr
 
 reader = easyocr.Reader(["es"] , gpu=False)
-image = cv2.imread("plate_1.jpg")
+image = cv2.imread("plate_33.jpg")
 result = reader.readtext(image, paragraph=False)
 
 for res in result:

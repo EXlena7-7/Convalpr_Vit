@@ -1,4 +1,5 @@
 import os
+import hashlib
 # Mostrar solo errores de TensorFlow
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 # Desabilitar GPU ( correr en CPU )
@@ -40,13 +41,32 @@ arrayReconocidos = [];
 class ImageEventHandler(FileSystemEventHandler):
 
     image_path = os.path.join(os.path.dirname(__file__), 'plates')
-    
+    hash_dict = {}
     def on_created(self, event):
         if not event.is_directory:
+        
             # Apply OCR to the new image
             image_path = event.src_path
+            
+            # Aqui es la lectura de la imagen 
             image = cv2.imread(image_path)
-            text = pytesseract.image_to_string(image, lang='spa')
+            # Calcular el hash de la imagen
+            # file_hash = self.calculate_hash(image_path)
+            
+            # # Verificar si el hash ya existe en el diccionario
+            # if file_hash in self.hash_dict:
+            #     print(f"Duplicado encontrado: {image_path} y {self.hash_dict[file_hash]}")
+            #     os.remove(image_path)  # Eliminar el archivo duplicado
+            # else:
+            #     self.hash_dict[file_hash] = image_path
+
+    # def calculate_hash(self, file_path):
+    #     hasher = hashlib.md5()
+    #     with open(file_path, 'rb') as f:
+    #         buf = f.read()
+    #         hasher.update(buf)
+    #     return hasher.hexdigest()
+            # text = pytesseract.image_to_string(image, lang='spa')
             #print(text, f"OCR Result: {text}")
             
 def on_created(src_path: str):
@@ -126,13 +146,13 @@ async def gen_frames(cfg, demo=True, benchmark=True, save_vid=False):
                 break  
                 
                         # Reduce video quality using ffmpeg-python
-            (
-                ffmpeg
-                .input('pipe:', format='rawvideo', pix_fmt='rgb24', s='{}x{}'.format(*frame.shape[1::-1]))
-                .output('pipe:', format='rawvideo', pix_fmt='rgb24', vcodec='libx264', crf=24)
-                .overwrite_output()
-                .run_async(pipe_stdin=True, pipe_stdout=True)
-            )
+            # (
+            #     ffmpeg
+            #     .input('pipe:', format='rawvideo', pix_fmt='rgb24', s='{}x{}'.format(*frame.shape[1::-1]))
+            #     .output('pipe:', format='rawvideo', pix_fmt='rgb24', vcodec='libx264', crf=24)
+            #     .overwrite_output()
+            #     .run_async(pipe_stdin=True, pipe_stdout=True)
+            # )
             
             if demo:
             
@@ -146,6 +166,23 @@ async def gen_frames(cfg, demo=True, benchmark=True, save_vid=False):
                 y1 = int(coor[0] * image_h)
                 x2 = int(coor[3] * image_w)
                 y2 = int(coor[2] * image_h) 
+                new_frame = plate_foto.copy()[y1:y2, x1:x2]
+                
+                
+                # cv2.imshow('Plate', new_frame)
+                image = cv2.imencode('.jpg', new_frame)[1].tobytes()
+                
+                frame_name = 'plates\plate_{}.jpg'.format(count)
+                print(frame_name);
+                image = cv2.imwrite(frame_name,new_frame)
+                valor = read_image(frame_name)
+                if ( valor == False ) :
+                    try:
+                        os.remove(frame_name)
+                        print('hora')
+                    except FileNotFoundError:    
+                        print('El archivo no se encontro')
+                count = count + 1
             
               # Obtén las dimensiones originales del frame
             height, width, _ = frame.shape
