@@ -137,5 +137,5 @@ watchdog==3.0.0
 webencodings==0.5.1
 websocket-client==1.6.2
 Werkzeug==3.0.0
-yolo==0.3.1
+
 zipp==3.16.2
