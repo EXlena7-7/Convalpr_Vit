@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 from starlette.requests import Request
 import asyncio
 
-from vidgear.gears import VideoGear
+from vidgear.gears import CamGear
 
 from typing import Callable
 import numpy as np 
@@ -32,7 +32,7 @@ fechaActual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-import ffmpeg
+# import ffmpeg
 from PIL import Image
 
 
@@ -136,15 +136,17 @@ async def gen_frames(cfg, demo=True, benchmark=True, save_vid=False):
     count = 1
 
     try:
-        stream = VideoGear(source='rtsp://admin:abc123**@192.168.7.136').start()
+        stream = CamGear(source='./assets/trafico.mp4').start()
         
         while True:
             ret, frame = cap.read()
-            frame = cv2 .cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frame = stream.read()
+          
             if ret is False:
                 break  
-                
+            frame = cv2 .cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frame = stream.read()
+            if frame is None or np.sum(frame) ==  0:
+                continue 
                         # Reduce video quality using ffmpeg-python
             # (
             #     ffmpeg
