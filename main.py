@@ -36,7 +36,7 @@ from watchdog.events import FileSystemEventHandler
 from PIL import Image
 
 
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract'
+# pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract'
 arrayReconocidos = [];
 class ImageEventHandler(FileSystemEventHandler):
 
