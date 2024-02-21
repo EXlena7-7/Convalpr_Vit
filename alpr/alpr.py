@@ -92,7 +92,7 @@ class ALPR(SqlSaver):
                 plate = (''.join(plate)).replace('_', '')
                 # print(plate)
                 mostrar_txt = f'{plate} {avg * 100:.2f}%'
-                print(mostrar_txt)
+                # print(mostrar_txt) //Ocr de las placas por defecto!
                 cv2.putText(img=frame, text=mostrar_txt, org=(x1 - 20, y1 - 15),
                             fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=fontScale,
                             color=[0, 0, 0], lineType=cv2.LINE_AA, thickness=6)

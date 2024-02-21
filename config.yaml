@@ -13,7 +13,7 @@ video:
 
     # Imagen en disco
     # (usar reconocedor_automatico.py)
-    fuente: './assets/trafico.mp4'
+    fuente: 'rtsp://admin:abc123**@192.168.7.136'
 
     # Cada cuantos Frames hacer inferencia
     # No se aplica si --demo

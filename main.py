@@ -36,7 +36,7 @@ from watchdog.events import FileSystemEventHandler
 from PIL import Image
 
 
-# pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract'
+pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract'
 arrayReconocidos = [];
 class ImageEventHandler(FileSystemEventHandler):
 
@@ -51,30 +51,30 @@ class ImageEventHandler(FileSystemEventHandler):
             # Aqui es la lectura de la imagen 
             image = cv2.imread(image_path)
             # Calcular el hash de la imagen
-            # file_hash = self.calculate_hash(image_path)
+            file_hash = self.calculate_hash(image_path)
             
             # # Verificar si el hash ya existe en el diccionario
-            # if file_hash in self.hash_dict:
-            #     print(f"Duplicado encontrado: {image_path} y {self.hash_dict[file_hash]}")
-            #     os.remove(image_path)  # Eliminar el archivo duplicado
-            # else:
-            #     self.hash_dict[file_hash] = image_path
+            if file_hash in self.hash_dict:
+                print(f"Duplicado encontrado: {image_path} y {self.hash_dict[file_hash]}")
+                os.remove(image_path)  # Eliminar el archivo duplicado
+            else:
+                self.hash_dict[file_hash] = image_path
 
-    # def calculate_hash(self, file_path):
-    #     hasher = hashlib.md5()
-    #     with open(file_path, 'rb') as f:
-    #         buf = f.read()
-    #         hasher.update(buf)
-    #     return hasher.hexdigest()
-            # text = pytesseract.image_to_string(image, lang='spa')
-            #print(text, f"OCR Result: {text}")
+    def calculate_hash(self, file_path):
+        hasher = hashlib.md5()
+        with open(file_path, 'rb') as f:
+            buf = f.read()
+            hasher.update(buf)
+        return hasher.hexdigest()
+        text = pytesseract.image_to_string(image, lang='spa')
+        print(text, f"OCR Result: {text}")
             
 def on_created(src_path: str):
         # Apply OCR to the new image
         print(src_path)
         image = cv2.imread(src_path)
-        # text = pytesseract.image_to_string(image, lang='spa')
-        #print(text, f"OCR Result: {text}")
+        text = pytesseract.image_to_string(image, lang='spa')
+        print(text, f"OCR Result: {text}")
 
 def save_temp_file(file: bytes, callback: Callable[[str], any]):
     with tempfile.NamedTemporaryFile(delete=True) as temp:
@@ -91,7 +91,7 @@ logger.setLevel(logging.INFO)
 
 
 def read_image(path: str):
-    #img = Image.open(path).convert("1")
+    img = Image.open(path).convert("1")
     img = cv2.imread(path, cv2.IMREAD_GRAYSCALE) 
     cv2.dilate(img, (5, 5), img)
     text = pytesseract.image_to_string(img)
@@ -102,9 +102,41 @@ def read_image(path: str):
     if( not exist ):
         arrayReconocidos.append(text)
     return not exist
+    text = pytesseract.image_to_string(img, lang='eng')
     return text;
-#    text = pytesseract.image_to_string(img, lang='eng')
     
+#    
+def calculate_file_hash(file_path):
+    """Calcula el valor hash del contenido de un archivo."""
+    hasher = hashlib.md5()
+    with open(file_path, 'rb') as file:
+        for chunk in iter(lambda: file.read(4096), b''):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+def find_duplicate_files(root_folder):
+    """Recorre la carpeta raíz y identifica archivos duplicados."""
+    duplicates = {}
+    for folder_path, _, file_names in os.walk(root_folder):
+        for file_name in file_names:
+            file_path = os.path.join(folder_path, file_name)
+            file_hash = calculate_file_hash(file_path)
+            if file_hash in duplicates:
+                duplicates[file_hash].append(file_path)
+            else:
+                duplicates[file_hash] = [file_path]
+    return duplicates
+
+def remove_duplicate_files(duplicates):
+    """Elimina archivos duplicados del sistema de archivos."""
+    for file_paths in duplicates.values():
+        if len(file_paths) >  1:
+            print(f"Archivos duplicados encontrados:\n{file_paths}\n")
+            for file_path in file_paths[1:]:
+                os.remove(file_path)
+                print(f"{file_path} ha sido eliminado.\n")
+
+
 app = FastAPI()
 
 @app.get("/")
@@ -122,13 +154,7 @@ async def gen_frames(cfg, demo=True, benchmark=True, save_vid=False):
     observer.schedule(ImageEventHandler(), path='plates', recursive=False)
     observer.daemon = True
     observer.start()
-    # if save_vid:
-    #     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) + 0.5)
-    #     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) + 0.5)
-    #     size = (width, height)
-        # fourcc = cv2.VideoWriter_fourcc(*'XVID')
-        # out = cv2.VideoWriter('alpr-result.avi', fourcc, 20.0, size)
-    # Cada cuantos frames hacer inferencia
+
     intervalo_reconocimiento = cfg['video']['frecuencia_inferencia']
     if not is_img:
         logger.info(f'El intervalo del reconocimiento para el video es de: {intervalo_reconocimiento}')
@@ -136,7 +162,7 @@ async def gen_frames(cfg, demo=True, benchmark=True, save_vid=False):
     count = 1
 
     try:
-        stream = CamGear(source='./assets/trafico.mp4').start()
+        stream = CamGear(source='rtsp://admin:abc123**@192.168.7.136').start()
         
         while True:
             ret, frame = cap.read()
@@ -173,7 +199,6 @@ async def gen_frames(cfg, demo=True, benchmark=True, save_vid=False):
                 
                 # cv2.imshow('Plate', new_frame)
                 image = cv2.imencode('.jpg', new_frame)[1].tobytes()
-                
                 frame_name = 'plates\plate_{}.jpg'.format(count)
                 print(frame_name);
                 image = cv2.imwrite(frame_name,new_frame)
@@ -208,17 +233,16 @@ async def gen_frames(cfg, demo=True, benchmark=True, save_vid=False):
 
 
 if __name__ == '__main__':
-
+    root_folder = './plates'
+    duplicates = find_duplicate_files(root_folder)
+    remove_duplicate_files(duplicates)
     try:
         parser = ArgumentParser()
         parser.add_argument("--cfg", dest="cfg_file", help="Path del archivo de config, \
                             default: ./config.yaml", default='config.yaml')
         parser.add_argument("--demo", dest="demo",
                             action='store_true', help="En vez de guardar las patentes, mostrar las predicciones")
-        # parser.add_argument("--guardar_video", dest="save_video",
-        #                     action='store_true', help="Guardar video en ./alpr-result.avi")
-        # parser.add_argument("--benchmark", dest="bench",
-        #                     action='store_true', help="Medir la inferencia (incluye todo el pre/post processing")
+
         args = parser.parse_args()
         with open(args.cfg_file, 'r') as stream:
             try:
