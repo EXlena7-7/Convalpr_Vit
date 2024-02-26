@@ -7,13 +7,13 @@ video:
 
     # Camara IP
     #fuente: 'rtsp://usuario:pass@IP:Puerto'
-    # fuente: 'rtsp://admin:Covv01*@200.109.234.154:8000'
+    fuente: 'rtsp://admin:abc123**@192.168.7.136'
     # Video en disco
     # fuente: 'C:/Usuarios/User/Escritorio/ejemplo.mp4'
 
     # Imagen en disco
     # (usar reconocedor_automatico.py)
-    fuente: './assets/trafico.mp4'
+    # fuente: './assets/trafico.mp4'
 
     # Cada cuantos Frames hacer inferencia
     # No se aplica si --demo
