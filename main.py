@@ -9,9 +9,7 @@ from fastapi import FastAPI, Response, UploadFile, File
 from fastapi.responses import StreamingResponse
 from starlette.requests import Request
 import asyncio
-
 from vidgear.gears import CamGear
-
 from typing import Callable
 import numpy as np 
 if not os.path.exists('plates'):
@@ -28,12 +26,39 @@ import pytesseract
 import tempfile
 from datetime import datetime
 fechaActual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+from fastapi.middleware.cors import CORSMiddleware
+
+from fastapi import FastAPI, HTTPException, Query
+from sqlalchemy import Column, Integer, String
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine
+from sqlalchemy import desc
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.ext.declarative import declarative_base
 
 # import ffmpeg
 from PIL import Image
+import easyocr
+
+pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract'
+
+SQLALCHEMY_DATABASE_URL = "postgresql://postgres:password@localhost/prueba" 
+
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base = declarative_base()
+
+class Image(Base):
+    __tablename__ = "images"
+    id = Column(Integer, primary_key=True, index=True)
+    file_name = Column(String, index=True)
+
+Base.metadata.create_all(bind=engine)
 
 
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract'
@@ -51,23 +76,23 @@ class ImageEventHandler(FileSystemEventHandler):
             # Aqui es la lectura de la imagen 
             image = cv2.imread(image_path)
             # Calcular el hash de la imagen
-            file_hash = self.calculate_hash(image_path)
+            # file_hash = self.calculate_hash(image_path)
             
             # # Verificar si el hash ya existe en el diccionario
-            if file_hash in self.hash_dict:
-                print(f"Duplicado encontrado: {image_path} y {self.hash_dict[file_hash]}")
-                os.remove(image_path)  # Eliminar el archivo duplicado
-            else:
-                self.hash_dict[file_hash] = image_path
+            # if file_hash in self.hash_dict:
+            #     print(f"Duplicado encontrado: {image_path} y {self.hash_dict[file_hash]}")
+            #     os.remove(image_path)  # Eliminar el archivo duplicado
+            # else:
+            #     self.hash_dict[file_hash] = image_path
 
-    def calculate_hash(self, file_path):
-        hasher = hashlib.md5()
-        with open(file_path, 'rb') as f:
-            buf = f.read()
-            hasher.update(buf)
-        return hasher.hexdigest()
-        text = pytesseract.image_to_string(image, lang='spa')
-        print(text, f"OCR Result: {text}")
+    # def calculate_hash(self, file_path):
+    #     hasher = hashlib.md5()
+    #     with open(file_path, 'rb') as f:
+    #         buf = f.read()
+    #         hasher.update(buf)
+    #     return hasher.hexdigest()
+            # text = pytesseract.image_to_string(image, lang='spa')
+            #print(text, f"OCR Result: {text}")
             
 def on_created(src_path: str):
         # Apply OCR to the new image
@@ -91,7 +116,7 @@ logger.setLevel(logging.INFO)
 
 
 def read_image(path: str):
-    img = Image.open(path).convert("1")
+    #img = Image.open(path).convert("1")
     img = cv2.imread(path, cv2.IMREAD_GRAYSCALE) 
     cv2.dilate(img, (5, 5), img)
     text = pytesseract.image_to_string(img)
@@ -104,40 +129,50 @@ def read_image(path: str):
     return not exist
     text = pytesseract.image_to_string(img, lang='eng')
     return text;
+#    text = pytesseract.image_to_string(img, lang='eng')
     
-#    
-def calculate_file_hash(file_path):
-    """Calcula el valor hash del contenido de un archivo."""
-    hasher = hashlib.md5()
-    with open(file_path, 'rb') as file:
-        for chunk in iter(lambda: file.read(4096), b''):
-            hasher.update(chunk)
-    return hasher.hexdigest()
-
-def find_duplicate_files(root_folder):
-    """Recorre la carpeta raíz y identifica archivos duplicados."""
-    duplicates = {}
-    for folder_path, _, file_names in os.walk(root_folder):
-        for file_name in file_names:
-            file_path = os.path.join(folder_path, file_name)
-            file_hash = calculate_file_hash(file_path)
-            if file_hash in duplicates:
-                duplicates[file_hash].append(file_path)
-            else:
-                duplicates[file_hash] = [file_path]
-    return duplicates
-
-def remove_duplicate_files(duplicates):
-    """Elimina archivos duplicados del sistema de archivos."""
-    for file_paths in duplicates.values():
-        if len(file_paths) >  1:
-            print(f"Archivos duplicados encontrados:\n{file_paths}\n")
-            for file_path in file_paths[1:]:
-                os.remove(file_path)
-                print(f"{file_path} ha sido eliminado.\n")
-
-
 app = FastAPI()
+
+
+origins = ["*"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.mount("/static", StaticFiles(directory="./plates"), name="static")
+
+@app.get("/placas")
+def get_images(page: int = Query(1, gt=0), page_size: int = Query(10, gt=0, le=100)):
+    # Calcular el índice de inicio y fin para la paginación
+    start_index = (page - 1) * page_size
+    end_index = start_index + page_size
+
+    # Crear una sesión
+    db = SessionLocal()
+
+    # Consultar todas las imágenes almacenadas en la base de datos, ordenadas por ID en orden descendente
+    images = db.query(Image).order_by(desc(Image.id)).offset(start_index).limit(page_size).all()
+
+    # Cerrar la sesión
+    db.close()
+
+    # Si no se encontraron imágenes en la página especificada, lanzar una excepción 404
+    if not images:
+        raise HTTPException(status_code=404, detail="No se encontraron imágenes en la página especificada")
+
+    # Devolver las imágenes como respuesta
+    return images
+
+
+@app.get("/ultimo")
+def return_images():
+    list = os.listdir('./plates')
+
+    ultimo_elemento = list[-1]
+    return ultimo_elemento;
 
 @app.get("/")
 def read_root():
@@ -162,7 +197,7 @@ async def gen_frames(cfg, demo=True, benchmark=True, save_vid=False):
     count = 1
 
     try:
-        stream = CamGear(source='rtsp://admin:abc123**@192.168.7.136').start()
+        stream = CamGear(source='rtsp://admin:Vt3lc4123@38.51.120.236:8061').start()
         
         while True:
             ret, frame = cap.read()
@@ -196,9 +231,8 @@ async def gen_frames(cfg, demo=True, benchmark=True, save_vid=False):
                 y2 = int(coor[2] * image_h) 
                 new_frame = plate_foto.copy()[y1:y2, x1:x2]
                 
-                
-                # cv2.imshow('Plate', new_frame)
                 image = cv2.imencode('.jpg', new_frame)[1].tobytes()
+                
                 frame_name = 'plates\plate_{}.jpg'.format(count)
                 print(frame_name);
                 image = cv2.imwrite(frame_name,new_frame)
@@ -210,6 +244,44 @@ async def gen_frames(cfg, demo=True, benchmark=True, save_vid=False):
                     except FileNotFoundError:    
                         print('El archivo no se encontro')
                 count = count + 1
+                reader = easyocr.Reader(["es"] , gpu=False)
+
+                # Directory containing the images
+                directory = './plates'
+
+                # Iterate over all files in the directory
+                for filename in os.listdir(directory):
+                    if filename.endswith(".jpg"):  # Add more conditions if you have different file types
+                        # Construct full file path
+                        filepath = os.path.join(directory, filename)
+                        
+                        # Read the image
+                        image = cv2.imread(filepath)
+                        
+                        result = reader.readtext(image, paragraph=False)
+
+                        arrayReconocidos = [...]
+
+                        for res in result:
+
+                            result = res[1]  
+
+                            print("patente: ", result)
+
+                            # exist = result in arrayReconocidos
+                            # if( not exist ):
+                            #     arrayReconocidos.append(result)
+                            #     return not exist
+                            
+                            
+                db = SessionLocal()
+
+                # Crear un objeto de la clase Image utilizando el nombre del archivo
+                new_image = Image(file_name=frame_name)
+
+                # Agregar el objeto a la sesión y confirmar los cambios
+                db.add(new_image)
+                db.commit()
             
               # Obtén las dimensiones originales del frame
             height, width, _ = frame.shape
@@ -233,9 +305,9 @@ async def gen_frames(cfg, demo=True, benchmark=True, save_vid=False):
 
 
 if __name__ == '__main__':
-    root_folder = './plates'
-    duplicates = find_duplicate_files(root_folder)
-    remove_duplicate_files(duplicates)
+    # root_folder = './plates'
+    # duplicates = find_duplicate_files(root_folder)
+    # remove_duplicate_files(duplicates)
     try:
         parser = ArgumentParser()
         parser.add_argument("--cfg", dest="cfg_file", help="Path del archivo de config, \
@@ -258,7 +330,13 @@ if __name__ == '__main__':
 
 @app.get("/video_feed/")
 async def video_feed():
-    # Load the configuration here (this is just an example, you'll need to adjust it)
-    with open('config.yaml', 'r') as stream:
-        cfg = yaml.safe_load(stream)
-    return StreamingResponse(gen_frames(cfg), media_type="multipart/x-mixed-replace;boundary=frame")
+    try:
+        # Load the configuration here (this is just an example, you'll need to adjust it)
+        with open('config.yaml', 'r') as stream:
+            cfg = yaml.safe_load(stream)
+        return StreamingResponse(gen_frames(cfg), media_type="multipart/x-mixed-replace;boundary=frame")
+
+    except Exception as e:
+        error_message = {"Cámara no encontrada": str(e)}
+    return error_message
+
