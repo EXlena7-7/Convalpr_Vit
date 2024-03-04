@@ -34,8 +34,30 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from fastapi.middleware.cors import CORSMiddleware
 
+from fastapi import FastAPI, HTTPException, Query
+from sqlalchemy import Column, Integer, String
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine
+from sqlalchemy import desc
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.ext.declarative import declarative_base
+
 # import ffmpeg
 from PIL import Image
+
+SQLALCHEMY_DATABASE_URL = "postgresql://postgres:123456@localhost/prueba"
+
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base = declarative_base()
+
+class Image(Base):
+    __tablename__ = "images"
+    id = Column(Integer, primary_key=True, index=True)
+    file_name = Column(String, index=True)
+
+Base.metadata.create_all(bind=engine)
 
 
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract'
@@ -70,6 +92,9 @@ class ImageEventHandler(FileSystemEventHandler):
         return hasher.hexdigest()
             # text = pytesseract.image_to_string(image, lang='spa')
             # print(text, f"OCR Result: {text}")
+    
+
+
             
 def on_created(src_path: str):
         # Apply OCR to the new image
@@ -109,6 +134,8 @@ def read_image(path: str):
     
     
 app = FastAPI()
+
+
 origins = ["*"]
 app.add_middleware(
     CORSMiddleware,
@@ -119,10 +146,35 @@ app.add_middleware(
 )
 app.mount("/static", StaticFiles(directory="./plates"), name="static")
 
-@app.get("/images")
+@app.get("/placas")
+def get_images(page: int = Query(1, gt=0), page_size: int = Query(10, gt=0, le=100)):
+    # Calcular el índice de inicio y fin para la paginación
+    start_index = (page - 1) * page_size
+    end_index = start_index + page_size
+
+    # Crear una sesión
+    db = SessionLocal()
+
+    # Consultar todas las imágenes almacenadas en la base de datos, ordenadas por ID en orden descendente
+    images = db.query(Image).order_by(desc(Image.id)).offset(start_index).limit(page_size).all()
+
+    # Cerrar la sesión
+    db.close()
+
+    # Si no se encontraron imágenes en la página especificada, lanzar una excepción 404
+    if not images:
+        raise HTTPException(status_code=404, detail="No se encontraron imágenes en la página especificada")
+
+    # Devolver las imágenes como respuesta
+    return images
+
+
+@app.get("/ultimo")
 def return_images():
     list = os.listdir('./plates')
-    return list;
+
+    ultimo_elemento = list[-1]
+    return ultimo_elemento;
 
 @app.get("/")
 def read_root():
@@ -196,6 +248,15 @@ async def gen_frames(cfg, demo=True, benchmark=True, save_vid=False):
                     except FileNotFoundError:    
                         print('El archivo no se encontro')
                 count = count + 1
+
+                db = SessionLocal()
+
+                # Crear un objeto de la clase Image utilizando el nombre del archivo
+                new_image = Image(file_name=frame_name)
+
+                # Agregar el objeto a la sesión y confirmar los cambios
+                db.add(new_image)
+                db.commit()
             
               # Obtén las dimensiones originales del frame
             height, width, _ = frame.shape
