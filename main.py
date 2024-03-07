@@ -22,7 +22,6 @@ import yaml
 import logging
 from timeit import default_timer as timer
 import cv2
-import pytesseract
 import tempfile
 from datetime import datetime
 fechaActual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -44,8 +43,6 @@ from sqlalchemy.ext.declarative import declarative_base
 from PIL import Image
 import easyocr
 
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract'
-
 SQLALCHEMY_DATABASE_URL = "postgresql://postgres:password@localhost/prueba" 
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
@@ -60,9 +57,7 @@ class Image(Base):
 
 Base.metadata.create_all(bind=engine)
 
-
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract'
-arrayReconocidos = [];
+arrayReconocidos = []
 class ImageEventHandler(FileSystemEventHandler):
 
     image_path = os.path.join(os.path.dirname(__file__), 'plates')
@@ -75,31 +70,8 @@ class ImageEventHandler(FileSystemEventHandler):
             
             # Aqui es la lectura de la imagen 
             image = cv2.imread(image_path)
-            # Calcular el hash de la imagen
-            # file_hash = self.calculate_hash(image_path)
-            
-            # # Verificar si el hash ya existe en el diccionario
-            # if file_hash in self.hash_dict:
-            #     print(f"Duplicado encontrado: {image_path} y {self.hash_dict[file_hash]}")
-            #     os.remove(image_path)  # Eliminar el archivo duplicado
-            # else:
-            #     self.hash_dict[file_hash] = image_path
 
-    # def calculate_hash(self, file_path):
-    #     hasher = hashlib.md5()
-    #     with open(file_path, 'rb') as f:
-    #         buf = f.read()
-    #         hasher.update(buf)
-    #     return hasher.hexdigest()
-            # text = pytesseract.image_to_string(image, lang='spa')
-            #print(text, f"OCR Result: {text}")
-            
-def on_created(src_path: str):
-        # Apply OCR to the new image
-        print(src_path)
-        image = cv2.imread(src_path)
-        text = pytesseract.image_to_string(image, lang='spa')
-        print(text, f"OCR Result: {text}")
+
 
 def save_temp_file(file: bytes, callback: Callable[[str], any]):
     with tempfile.NamedTemporaryFile(delete=True) as temp:
@@ -114,22 +86,44 @@ logging.basicConfig()
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-
 def read_image(path: str):
-    #img = Image.open(path).convert("1")
-    img = cv2.imread(path, cv2.IMREAD_GRAYSCALE) 
+    reader = easyocr.Reader(['en'])  # Carga el modelo de EasyOCR para inglés
+
+    img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
     cv2.dilate(img, (5, 5), img)
-    text = pytesseract.image_to_string(img)
-    if( text == ""):
+
+    # Utiliza EasyOCR para reconocer texto en la imagen
+    result = reader.readtext(img)
+
+    # Verifica si se detectó algún texto
+    if( result == ""):
         return False
+
+
+async def read_ocr(path: str):
+    reader = easyocr.Reader(["es"] , gpu=False)
+    directory = './plates'
+
+    for filename in os.listdir(directory):
+        if filename.endswith(".jpg"):
+            filepath = os.path.join(directory, filename)
+
+        image = cv2.imread(filepath)
+        text = reader.readtext(image, paragraph=False)
+
+        resultados = [...]
+        # Extrae solo el texto de cada predicción
+        for res in text:
+
+            text = res[1]  
+
+            print("Patente: ", text) 
     
-    exist = text in arrayReconocidos
-    if( not exist ):
-        arrayReconocidos.append(text)
-    return not exist
-    text = pytesseract.image_to_string(img, lang='eng')
-    return text;
-#    text = pytesseract.image_to_string(img, lang='eng')
+            exist = text in arrayReconocidos
+            if( not exist ):
+                arrayReconocidos.append(text)
+            return not exist
+
     
 app = FastAPI()
 
@@ -243,37 +237,9 @@ async def gen_frames(cfg, demo=True, benchmark=True, save_vid=False):
                         print('hora')
                     except FileNotFoundError:    
                         print('El archivo no se encontro')
-                count = count + 1
-                reader = easyocr.Reader(["es"] , gpu=False)
 
-                # Directory containing the images
-                directory = './plates'
 
-                # Iterate over all files in the directory
-                for filename in os.listdir(directory):
-                    if filename.endswith(".jpg"):  # Add more conditions if you have different file types
-                        # Construct full file path
-                        filepath = os.path.join(directory, filename)
-                        
-                        # Read the image
-                        image = cv2.imread(filepath)
-                        
-                        result = reader.readtext(image, paragraph=False)
-
-                        arrayReconocidos = [...]
-
-                        for res in result:
-
-                            result = res[1]  
-
-                            print("patente: ", result)
-
-                            # exist = result in arrayReconocidos
-                            # if( not exist ):
-                            #     arrayReconocidos.append(result)
-                            #     return not exist
-                            
-                            
+ 
                 db = SessionLocal()
 
                 # Crear un objeto de la clase Image utilizando el nombre del archivo
