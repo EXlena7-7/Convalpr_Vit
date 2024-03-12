@@ -1,5 +1,4 @@
 import string
-import pytesseract
 import cv2
 import numpy as np
 import tensorflow as tf

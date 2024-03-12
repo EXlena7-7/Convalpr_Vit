@@ -19,6 +19,7 @@ import time
 from alpr.alpr import ALPR
 from argparse import ArgumentParser
 import yaml
+from services.video_capture import VideoCapture
 import logging
 from timeit import default_timer as timer
 import cv2
@@ -38,17 +39,18 @@ from sqlalchemy import create_engine
 from sqlalchemy import desc
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.declarative import declarative_base
-
+import tempfile
 # import ffmpeg
 from PIL import Image
 import easyocr
 
-SQLALCHEMY_DATABASE_URL = "postgresql://postgres:password@localhost/prueba" 
 
+
+SQLALCHEMY_DATABASE_URL = "postgresql://postgres:password@localhost/prueba" 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
 Base = declarative_base()
+
 
 class Image(Base):
     __tablename__ = "images"
@@ -73,58 +75,32 @@ class ImageEventHandler(FileSystemEventHandler):
 
 
 
-def save_temp_file(file: bytes, callback: Callable[[str], any]):
-    with tempfile.NamedTemporaryFile(delete=True) as temp:
-        data = file
-        temp.write(data)
-        temp_path = temp.name
-        print(temp_path)
+def save_temp_file(file_content: bytes, callback: callable):
+    # Crear un archivo temporal en la carpeta 'plates' y eliminarlo automáticamente después de su uso
+    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=True, dir="plates") as temp_file:
+        # Escribir el contenido del archivo en el archivo temporal
+        temp_file.write(file_content)
+        temp_file.flush()
+
+        # Obtener la ruta del archivo temporal
+        temp_path = temp_file.name
+
+        # Llamar a la función de callback con la ruta del archivo temporal
         return callback(temp_path)
 
+# Ejemplo de uso
+def callback_function(file_path):
+    print("La imagen se guardó temporalmente en:", file_path)
+    # Aquí puedes hacer cualquier cosa con la imagen
+    # Por ejemplo, cargarla, procesarla, etc.
+
+# Llamada a la función save_temp_file con algún contenido de archivo y la función de callback
+save_temp_file(b'Contenido de la imagen', callback_function)
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-def read_image(path: str):
-    reader = easyocr.Reader(['en'])  # Carga el modelo de EasyOCR para inglés
-
-    img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
-    cv2.dilate(img, (5, 5), img)
-
-    # Utiliza EasyOCR para reconocer texto en la imagen
-    result = reader.readtext(img)
-
-    # Verifica si se detectó algún texto
-    if( result == ""):
-        return False
-
-
-async def read_ocr(path: str):
-    reader = easyocr.Reader(["es"] , gpu=False)
-    directory = './plates'
-
-    for filename in os.listdir(directory):
-        if filename.endswith(".jpg"):
-            filepath = os.path.join(directory, filename)
-
-        image = cv2.imread(filepath)
-        text = reader.readtext(image, paragraph=False)
-
-        resultados = [...]
-        # Extrae solo el texto de cada predicción
-        for res in text:
-
-            text = res[1]  
-
-            print("Patente: ", text) 
-    
-            exist = text in arrayReconocidos
-            if( not exist ):
-                arrayReconocidos.append(text)
-            return not exist
-
-    
 app = FastAPI()
 
 
@@ -136,6 +112,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 app.mount("/static", StaticFiles(directory="./plates"), name="static")
 
 @app.get("/placas")
@@ -168,112 +145,88 @@ def return_images():
     ultimo_elemento = list[-1]
     return ultimo_elemento;
 
+
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
 
-async def gen_frames(cfg, demo=True, benchmark=True, save_vid=False):
+async def save_plate(plate_foto: np.ndarray, alpr: ALPR, count: int):
+    out_boxes, __, _, num_boxes = alpr.bboxes
+    image_h, image_w, _ = plate_foto.shape
+    for i in range(num_boxes[0]):
+        coor = out_boxes[0][i]
+        x1 = int(coor[1] * image_w)
+        y1 = int(coor[0] * image_h)
+        x2 = int(coor[3] * image_w)
+        y2 = int(coor[2] * image_h)
+        new_frame = plate_foto.copy()[y1:y2, x1:x2]
+
+        # image = cv2.imencode('.jpg', new_frame)[1].tobytes()
+
+        # frame_name = 'plates\plate_{}.jpg'.format(count)
+        # print(frame_name)
+        # # cv2.imshow("plate", image)
+        # image = cv2.imwrite(frame_name,new_frame)
+        # valor = alpr.mostrar_predicts(frame_name)
+        # if ( valor == False ) :
+        #     try:
+        #         os.remove(frame_name)
+        #         print('hora')
+        #     except FileNotFoundError:    
+        #         print('El archivo no se encontro')
+
+
+async def resize_frame_to_bytes(frame: cv2.Mat):
+    # Obtén las dimensiones originales del frame
+    height, width, _ = frame.shape
+
+    # Define las nuevas dimensiones aquí. Por ejemplo, para reducir a la mitad:
+    new_width = width // 4
+    new_height = height // 4
+
+    resized_frame = cv2.resize(frame, (new_width, new_height), interpolation = cv2.INTER_AREA)
+
+    _, buffer = cv2.imencode('.jpg', frame)
+    return buffer.tobytes()
+
+
+async def gen_frames(cfg):
     alpr = ALPR(cfg['modelo'], cfg['db'])
     video_path = cfg['video']['fuente']
-    cap = cv2.VideoCapture(video_path)
-    is_img = cv2.haveImageReader(video_path)  # que hace? is_img
-    cv2_wait = 0 if is_img else 1
-    logger.info(f'Se va analizar la fuente: {video_path}')
-    observer = Observer()
-    observer.schedule(ImageEventHandler(), path='plates', recursive=False)
-    observer.daemon = True
-    observer.start()
-
-    intervalo_reconocimiento = cfg['video']['frecuencia_inferencia']
-    if not is_img:
-        logger.info(f'El intervalo del reconocimiento para el video es de: {intervalo_reconocimiento}')
+    cap = VideoCapture(video_path)
 
     count = 1
 
-    try:
-        stream = CamGear(source='rtsp://admin:Vt3lc4123@38.51.120.236:8061').start()
-        
-        while True:
-            ret, frame = cap.read()
-          
-            if ret is False:
-                break  
-            frame = cv2 .cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frame = stream.read()
-            if frame is None or np.sum(frame) ==  0:
-                continue 
-                        # Reduce video quality using ffmpeg-python
-            # (
-            #     ffmpeg
-            #     .input('pipe:', format='rawvideo', pix_fmt='rgb24', s='{}x{}'.format(*frame.shape[1::-1]))
-            #     .output('pipe:', format='rawvideo', pix_fmt='rgb24', vcodec='libx264', crf=24)
-            #     .overwrite_output()
-            #     .run_async(pipe_stdin=True, pipe_stdout=True)
-            # )
-            
-            if demo:
-            
-                plate_foto, total_time = alpr.mostrar_predicts(frame)
-             
-            out_boxes, __, _, num_boxes = alpr.bboxes
-            image_h, image_w, _ = plate_foto.shape
-            for i in range(num_boxes[0]):
-                coor = out_boxes[0][i]
-                x1 = int(coor[1] * image_w)
-                y1 = int(coor[0] * image_h)
-                x2 = int(coor[3] * image_w)
-                y2 = int(coor[2] * image_h) 
-                new_frame = plate_foto.copy()[y1:y2, x1:x2]
-                
-                image = cv2.imencode('.jpg', new_frame)[1].tobytes()
-                
-                frame_name = 'plates\plate_{}.jpg'.format(count)
-                print(frame_name);
-                image = cv2.imwrite(frame_name,new_frame)
-                valor = read_image(frame_name)
-                if ( valor == False ) :
-                    try:
-                        os.remove(frame_name)
-                        print('hora')
-                    except FileNotFoundError:    
-                        print('El archivo no se encontro')
+    while True:
+        try:
+            # stream = VideoCapture(video_path)
+            await asyncio.sleep(0.30)
+            frame = cap.read()
 
+            # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            # frame = stream.read()
 
- 
-                db = SessionLocal()
+            plate_foto, total_time = alpr.mostrar_predicts(frame)
 
-                # Crear un objeto de la clase Image utilizando el nombre del archivo
-                new_image = Image(file_name=frame_name)
+            # print(f"Total time: {total_time:.2f} seconds")
 
-                # Agregar el objeto a la sesión y confirmar los cambios
-                db.add(new_image)
-                db.commit()
-            
-              # Obtén las dimensiones originales del frame
-            height, width, _ = frame.shape
-            
-             # Define las nuevas dimensiones aquí. Por ejemplo, para reducir a la mitad:
-            new_width = width // 2
-            new_height = height // 2
-            
-            resized_frame = cv2.resize(frame, (new_width, new_height), interpolation = cv2.INTER_AREA)
-            
-            _, buffer = cv2.imencode('.jpg', resized_frame)
-            resized_frame = buffer.tobytes()
-            
-            
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + resized_frame + b'\r\n')
-    finally:
-        stream.stop()
+            asyncio.ensure_future(save_plate(plate_foto, alpr, count))
 
-        # frame_id += 1
+            # count = count + 1
+
+            yield (b'--frame\r\n'b'Content-Type: image/jpeg\r\n\r\n' + (await resize_frame_to_bytes(frame)) + b'\r\n')
+
+        except asyncio.CancelledError:
+            print('Coneccion cerrada')
+            raise e
+        except Exception as e:
+            print(e)
+            raise e
+
 
 
 if __name__ == '__main__':
-    # root_folder = './plates'
-    # duplicates = find_duplicate_files(root_folder)
-    # remove_duplicate_files(duplicates)
+
     try:
         parser = ArgumentParser()
         parser.add_argument("--cfg", dest="cfg_file", help="Path del archivo de config, \
