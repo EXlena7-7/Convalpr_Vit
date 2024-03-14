@@ -2,4 +2,4 @@
 
 # Aplicacion de Api con FastAPI para detectar placas
 
-# Video de prueba en assets/trafico.mp4
+# Video de prueba en assets/sample.mp4
