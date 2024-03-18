@@ -49,6 +49,7 @@ class ALPR(SqlSaver):
             cfg['numero_modelo_ocr'], cfg['confianza_avg_ocr'], cfg['confianza_low_ocr']
         )
         self.guardar_bd = cfg_db['guardar']
+        self.plate = None
 
     def predict(self, frame: np.ndarray) -> list:
         """
@@ -70,7 +71,7 @@ class ALPR(SqlSaver):
         # Hacer OCR a cada patente localizada
         self.iter_coords = self.detector.yield_coords(frame, self.bboxes)
         patentes = self.ocr.predict(self.iter_coords, frame)
-        print('Deteccion:  ', patentes)
+
         if self.guardar_bd:
             self.update_in_memory(patentes)
         return patentes
@@ -110,11 +111,14 @@ class ALPR(SqlSaver):
             plate, probs = self.ocr.predict_ocr(x1, y1, x2, y2, frame)
             total_time += timer() - start
             avg = np.mean(probs)
+            # print('Patente Camara 1: ',plate, 'Confianza: ',avg * 100, '%')
+            plate = (''.join(plate)).replace('_', '')
+            
+            
+            # print('Patente Camara 1: ',plate)
+            self.plate = plate
             if avg > self.ocr.confianza_avg and self.ocr.none_low(probs, thresh=self.ocr.none_low_thresh):
-                plate = (''.join(plate)).replace('_', '')
-
-
-                print('Patente Camara 1: ',plate)
+                
                 mostrar_txt = f'{plate} {avg * 100:.2f}%'
                 # print(mostrar_txt) //Ocr de las placas por defecto!
                 cv2.putText(img=frame, text=mostrar_txt, org=(x1 - 20, y1 - 15),

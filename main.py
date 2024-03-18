@@ -28,28 +28,51 @@ from datetime import datetime
 fechaActual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
+# from watchdog.observers import Observer
+# from watchdog.events import FileSystemEventHandler
 from fastapi.middleware.cors import CORSMiddleware
 
 from fastapi import FastAPI, HTTPException, Query
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, Column, Boolean, Integer, String, Float, DateTime, func
 from sqlalchemy import desc
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.declarative import declarative_base
+from datetime import datetime
 import tempfile
 # import ffmpeg
 from PIL import Image
-import easyocr
+# import easyocr
 
-
-
-SQLALCHEMY_DATABASE_URL = "postgresql://postgres:password@localhost/prueba" 
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Define el modelo base
 Base = declarative_base()
+
+# Define la clase del modelo para la tabla de placas y cámaras
+class PlateCamera(Base):
+    __tablename__ = 'plate_camera'
+
+    id = Column(String, primary_key=True)
+    plate_number = Column(String)
+    ip_camera = Column(String)
+    created_at = Column(DateTime, default=datetime.now)
+    
+    
+# Configura la conexión a la base de datos PostgreSQL
+engine = create_engine('postgresql://postgres:password@localhost/plates_detection')
+
+# SQLALCHEMY_DATABASE_URL = "postgresql://postgres:password@localhost/prueba" 
+# engine = create_engine(SQLALCHEMY_DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Base = declarative_base()
+
+
+# Crea todas las tablas definidas en los modelos en la base de datos
+Base.metadata.create_all(engine)
+
+# Crea una sesión de SQLAlchemy
+Session = sessionmaker(bind=engine)
+session = Session()
 
 
 class Image(Base):
@@ -60,42 +83,42 @@ class Image(Base):
 Base.metadata.create_all(bind=engine)
 
 arrayReconocidos = []
-class ImageEventHandler(FileSystemEventHandler):
+# class ImageEventHandler(FileSystemEventHandler):
 
-    image_path = os.path.join(os.path.dirname(__file__), 'plates')
-    hash_dict = {}
-    def on_created(self, event):
-        if not event.is_directory:
+#     image_path = os.path.join(os.path.dirname(__file__), 'plates')
+#     hash_dict = {}
+#     def on_created(self, event):
+#         if not event.is_directory:
         
-            # Apply OCR to the new image
-            image_path = event.src_path
+#             # Apply OCR to the new image
+#             image_path = event.src_path
             
-            # Aqui es la lectura de la imagen 
-            image = cv2.imread(image_path)
+#             # Aqui es la lectura de la imagen 
+#             image = cv2.imread(image_path)
 
 
 
-def save_temp_file(file_content: bytes, callback: callable):
-    # Crear un archivo temporal en la carpeta 'plates' y eliminarlo automáticamente después de su uso
-    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=True, dir="plates") as temp_file:
-        # Escribir el contenido del archivo en el archivo temporal
-        temp_file.write(file_content)
-        temp_file.flush()
+# def save_temp_file(file_content: bytes, callback: callable):
+#     # Crear un archivo temporal en la carpeta 'plates' y eliminarlo automáticamente después de su uso
+#     with tempfile.NamedTemporaryFile(suffix=".jpg", delete=True, dir="plates") as temp_file:
+#         # Escribir el contenido del archivo en el archivo temporal
+#         temp_file.write(file_content)
+#         temp_file.flush()
 
-        # Obtener la ruta del archivo temporal
-        temp_path = temp_file.name
+#         # Obtener la ruta del archivo temporal
+#         temp_path = temp_file.name
 
-        # Llamar a la función de callback con la ruta del archivo temporal
-        return callback(temp_path)
+#         # Llamar a la función de callback con la ruta del archivo temporal
+#         return callback(temp_path)
 
-# Ejemplo de uso
-def callback_function(file_path):
-    print("La imagen se guardó temporalmente en:", file_path)
-    # Aquí puedes hacer cualquier cosa con la imagen
-    # Por ejemplo, cargarla, procesarla, etc.
+# # Ejemplo de uso
+# def callback_function(file_path):
+#     print("La imagen se guardó temporalmente en:", file_path)
+#     # Aquí puedes hacer cualquier cosa con la imagen
+#     # Por ejemplo, cargarla, procesarla, etc.
 
-# Llamada a la función save_temp_file con algún contenido de archivo y la función de callback
-save_temp_file(b'Contenido de la imagen', callback_function)
+# # Llamada a la función save_temp_file con algún contenido de archivo y la función de callback
+# save_temp_file(b'Contenido de la imagen', callback_function)
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
@@ -114,6 +137,29 @@ app.add_middleware(
 )
 
 app.mount("/static", StaticFiles(directory="./plates"), name="static")
+
+ruta_configuracion = "config.yaml"
+def obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion):
+    with open(ruta_configuracion, 'r') as f:
+        config = yaml.safe_load(f)
+        fuente = config.get('video', {}).get('fuente', None)
+        if fuente:
+            # Verificar si la fuente es una URL RTSP
+            if fuente.startswith('rtsp://'):
+                # Extraer la parte de la URL que contiene la IP y el puerto
+                inicio_ip = fuente.find('@') + 1
+                final_ip = fuente.find(':', inicio_ip)
+                ip_camara = fuente[inicio_ip:final_ip]
+                # Extraer el puerto de la URL RTSP
+                inicio_puerto = final_ip + 1
+                final_puerto = fuente.find('/', inicio_puerto)
+                puerto_camara = fuente[inicio_puerto:final_puerto]
+                # print('Puerto:',puerto_camara)
+                return ip_camara, puerto_camara
+            else:
+                raise ValueError("La fuente no es una URL RTSP válida.")
+        else:
+            raise ValueError("La fuente no está especificada en el archivo de configuración.")
 
 @app.get("/placas")
 def get_images(page: int = Query(1, gt=0), page_size: int = Query(10, gt=0, le=100)):
@@ -160,6 +206,16 @@ async def save_plate(plate_foto: np.ndarray, alpr: ALPR, count: int):
         x2 = int(coor[3] * image_w)
         y2 = int(coor[2] * image_h)
         new_frame = plate_foto.copy()[y1:y2, x1:x2]
+        
+        
+        # Guardar los datos en la base de datos
+        plate_number = alpr.plate
+        
+        if len(plate_number) >= 6:  # Validación de longitud mínima de placa
+            ip_camera = obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion)[0]
+            nueva_entrada = PlateCamera(id=str(count), plate_number=plate_number, ip_camera=ip_camera)
+            session.add(nueva_entrada)
+            session.commit()
 
         # image = cv2.imencode('.jpg', new_frame)[1].tobytes()
 
@@ -186,31 +242,45 @@ async def resize_frame_to_bytes(frame: cv2.Mat):
 
     resized_frame = cv2.resize(frame, (new_width, new_height), interpolation = cv2.INTER_AREA)
 
-    _, buffer = cv2.imencode('.jpg', frame)
+    _, buffer = cv2.imencode('.jpg', resized_frame)
     return buffer.tobytes()
 
 
 async def gen_frames(cfg):
     alpr = ALPR(cfg['modelo'], cfg['db'])
     video_path = cfg['video']['fuente']
-    cap = VideoCapture(video_path)
-
+    CamGear  = VideoCapture(video_path)
+    placas = {}  # Diccionario para almacenar placas y sus IDs
     count = 1
 
     while True:
         try:
             # stream = VideoCapture(video_path)
             await asyncio.sleep(0.30)
-            frame = cap.read()
+            frame = CamGear.read()
 
             # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             # frame = stream.read()
 
             plate_foto, total_time = alpr.mostrar_predicts(frame)
 
-            # print(f"Total time: {total_time:.2f} seconds")
-
-            asyncio.ensure_future(save_plate(plate_foto, alpr, count))
+             # Verificar si la placa ya está en el diccionario
+            if alpr.plate in placas:
+                # Si la placa ya está en el diccionario, no necesitamos hacer nada más
+                pass
+            else:
+                # Si la placa es nueva, la agregamos al diccionario con su ID correspondiente
+                placas[alpr.plate] = count
+                count += 1
+                print('Placas Detectadas: ', placas)
+                
+                
+                # Función para guardar las placas en la base de datos
+                asyncio.ensure_future(save_plate(plate_foto, alpr, count))
+                
+                ruta_configuracion = "config.yaml"  # Ruta de tu archivo config.yaml
+                ip_camara = obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion)
+                print("CAMARA IP, puerto :", ip_camara)
 
             # count = count + 1
 
@@ -250,7 +320,7 @@ if __name__ == '__main__':
 @app.get("/video_feed/")
 async def video_feed():
     try:
-        # Load the configuration here (this is just an example, you'll need to adjust it)
+        
         with open('config.yaml', 'r') as stream:
             cfg = yaml.safe_load(stream)
         return StreamingResponse(gen_frames(cfg), media_type="multipart/x-mixed-replace;boundary=frame")

@@ -7,7 +7,7 @@ video:
 
     # Camara IP
     #fuente: 'rtsp://usuario:pass@IP:Puerto' rtsp://admin:Vt3lc4123@38.51.120.236:8061
-    fuente: 'rtsp://admin:Vt3lc4123@38.51.120.236:8061'
+    fuente: 'rtsp://admin:Vt3lc4123@38.51.120.236:8062'
     # Video en disco
     # fuente: 'C:/Usuarios/User/Escritorio/ejemplo.mp4'
 
