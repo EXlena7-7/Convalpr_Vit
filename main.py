@@ -36,7 +36,7 @@ from fastapi import FastAPI, HTTPException, Query
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine, Column, Boolean, Integer, String, Float, DateTime, func
-from sqlalchemy import desc
+from sqlalchemy import desc, asc
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
@@ -50,7 +50,7 @@ Base = declarative_base()
 
 # Define la clase del modelo para la tabla de placas y cámaras
 class PlateCamera(Base):
-    __tablename__ = 'plate_camera'
+    __tablename__ = 'registros'
 
     id = Column(String, primary_key=True)
     plate_number = Column(String)
@@ -59,11 +59,13 @@ class PlateCamera(Base):
     
     
 # Configura la conexión a la base de datos PostgreSQL
-engine = create_engine('postgresql://postgres:password@localhost/plates_detection')
+# engine = create_engine('postgresql://postgres:123456@localhost/prueba')
+engine = create_engine('postgresql://postgres:123456@192.168.7.246/detecion_semaforos')
 
 # SQLALCHEMY_DATABASE_URL = "postgresql://postgres:password@localhost/prueba" 
 # engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
 # Base = declarative_base()
 
 
@@ -74,6 +76,36 @@ Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 session = Session()
 
+
+def get_plate_cameras(pag: int = 0, limit: int = 10):
+    # Crear una sesión
+    db = SessionLocal()
+    try:
+        offset = pag * limit
+        # Realizar la consulta y devolver los resultados
+        return db.query(PlateCamera).offset(offset).limit(limit).all()
+    finally:
+        # Cerrar la sesión
+        db.close()
+        
+def get_total_plates():
+    db = SessionLocal()
+    try:
+        return db.query(PlateCamera).count();
+    finally:
+        db.close()
+        
+def get_last_plate_numbers():
+    db = SessionLocal()
+    try:
+        # plate_numbers = db.query(PlateCamera.plate_number).order_by(desc(PlateCamera.created_at)).limit(5).all()
+        plate_numbers = db.query(PlateCamera.plate_number).order_by(desc(PlateCamera.id)).limit(5).all()
+        
+        return [plate_number[0] for plate_number in plate_numbers]
+ 
+    finally:
+        db.close()
+        
 
 class Image(Base):
     __tablename__ = "images"
@@ -139,6 +171,9 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="./plates"), name="static")
 
 ruta_configuracion = "config.yaml"
+
+
+
 def obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion):
     with open(ruta_configuracion, 'r') as f:
         config = yaml.safe_load(f)
@@ -160,6 +195,24 @@ def obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion):
                 raise ValueError("La fuente no es una URL RTSP válida.")
         else:
             raise ValueError("La fuente no está especificada en el archivo de configuración.")
+
+
+@app.get("/plate_cameras/")
+def read_plate_cameras(pag: int = 0, limit: int = 10):
+    cameras = get_plate_cameras(pag,limit)
+    total = get_total_plates()
+    pages = total % limit
+    return {
+        'total': total,
+        'pages': pages,
+        'data': cameras,
+    }
+
+@app.get("/last_plate/")
+def read_last_plate_numbers():
+    plate_numbers = get_last_plate_numbers()
+    return plate_numbers
+
 
 @app.get("/placas")
 def get_images(page: int = Query(1, gt=0), page_size: int = Query(10, gt=0, le=100)):
@@ -242,7 +295,7 @@ async def resize_frame_to_bytes(frame: cv2.Mat):
 
     resized_frame = cv2.resize(frame, (new_width, new_height), interpolation = cv2.INTER_AREA)
 
-    _, buffer = cv2.imencode('.jpg', resized_frame)
+    _, buffer = cv2.imencode('.jpg', frame)
     return buffer.tobytes()
 
 
@@ -270,9 +323,13 @@ async def gen_frames(cfg):
                 pass
             else:
                 # Si la placa es nueva, la agregamos al diccionario con su ID correspondiente
+                
                 placas[alpr.plate] = count
+                count = len(placas)
+                placas.append("Nueva placa")
                 count += 1
                 print('Placas Detectadas: ', placas)
+                print("Contador:", count)
                 
                 
                 # Función para guardar las placas en la base de datos
@@ -289,9 +346,11 @@ async def gen_frames(cfg):
         except asyncio.CancelledError:
             print('Coneccion cerrada')
             raise e
+            break
         except Exception as e:
             print(e)
             raise e
+            break
 
 
 
