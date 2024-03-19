@@ -53,9 +53,10 @@ class PlateCamera(Base):
     __tablename__ = 'registros'
 
     id = Column(String, primary_key=True)
-    plate_number = Column(String)
-    ip_camera = Column(String)
-    created_at = Column(DateTime, default=datetime.now)
+    placa = Column(String)
+    # ip_camera = Column(String)
+    camara = Column(String)    
+    momento = Column(DateTime, default=datetime.now)
     
     
 # Configura la conexión a la base de datos PostgreSQL
@@ -99,7 +100,7 @@ def get_last_plate_numbers():
     db = SessionLocal()
     try:
         # plate_numbers = db.query(PlateCamera.plate_number).order_by(desc(PlateCamera.created_at)).limit(5).all()
-        plate_numbers = db.query(PlateCamera.plate_number).order_by(desc(PlateCamera.id)).limit(5).all()
+        plate_numbers = db.query(PlateCamera.placa).order_by(desc(PlateCamera.id)).limit(5).all()
         
         return [plate_number[0] for plate_number in plate_numbers]
  
@@ -266,7 +267,7 @@ async def save_plate(plate_foto: np.ndarray, alpr: ALPR, count: int):
         
         if len(plate_number) >= 6:  # Validación de longitud mínima de placa
             ip_camera = obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion)[0]
-            nueva_entrada = PlateCamera(id=str(count), plate_number=plate_number, ip_camera=ip_camera)
+            nueva_entrada = PlateCamera(id=str(count), placa=plate_number, camara=ip_camera)
             session.add(nueva_entrada)
             session.commit()
 
@@ -303,7 +304,7 @@ async def gen_frames(cfg):
     alpr = ALPR(cfg['modelo'], cfg['db'])
     video_path = cfg['video']['fuente']
     CamGear  = VideoCapture(video_path)
-    placas = {}  # Diccionario para almacenar placas y sus IDs
+    placas = []  # Diccionario para almacenar placas y sus IDs
     count = 1
 
     while True:
@@ -324,12 +325,16 @@ async def gen_frames(cfg):
             else:
                 # Si la placa es nueva, la agregamos al diccionario con su ID correspondiente
                 
-                placas[alpr.plate] = count
-                count = len(placas)
-                placas.append("Nueva placa")
-                count += 1
-                print('Placas Detectadas: ', placas)
-                print("Contador:", count)
+                #placas[alpr.plate] = count
+                if len(placas) == 50:
+                    placas.pop(0)
+                    
+                placas.append(alpr.plate)
+                # count = len(placas)
+                # placas.append("Nueva placa")
+                #count += 1
+                print('Placas Detectadas: ', len(placas))
+                # print("Contador:", count)
                 
                 
                 # Función para guardar las placas en la base de datos
