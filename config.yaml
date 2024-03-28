@@ -5,15 +5,18 @@ video:
     # Camara integrada
     #fuente: '0'
 
+    # fuente: 'rtsp://admin:abc123**@192.168.7.136'
     # Camara IP
     #fuente: 'rtsp://usuario:pass@IP:Puerto' rtsp://admin:Vt3lc4123@38.51.120.236:8061
-    fuente: 'rtsp://admin:Vt3lc4123@38.51.120.236:8061'
-    # Video en disco
-    # fuente: 'C:/Usuarios/User/Escritorio/ejemplo.mp4'
+    # fuente: 'rtsp://admin:Vt3lc4123@38.51.120.236:8061'
+    fuente: 'assets/carros.mp4'
 
+    # Video en disco
+    # fuente: 'C:/Usuarios/User/Escritorio/carros.mp4'
+    #  fuente: 'C:/Users/josevit/Desktop/carros.mp4'
+# "C:\Users\josevit\Desktop\carros.mp4"
     # Imagen en disco
     # (usar reconocedor_automatico.py)
-    # fuente: 'rtsp://admin:abc123**@192.168.7.136'
 
     # Cada cuantos Frames hacer inferencia
     # No se aplica si --demo

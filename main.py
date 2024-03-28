@@ -51,17 +51,17 @@ Base = declarative_base()
 # Define la clase del modelo para la tabla de placas y cámaras
 class PlateCamera(Base):
     __tablename__ = 'registros'
-
     id = Column(String, primary_key=True)
     placa = Column(String)
     # ip_camera = Column(String)
     camara = Column(String)    
+    interseccion = Column(String)
     momento = Column(DateTime, default=datetime.now)
     
     
 # Configura la conexión a la base de datos PostgreSQL
-# engine = create_engine('postgresql://postgres:123456@localhost/prueba')
-engine = create_engine('postgresql://postgres:123456@192.168.7.246/detecion_semaforos')
+engine = create_engine('postgresql://postgres:123456@localhost/otra_prueba')
+# engine = create_engine('postgresql://postgres:123456@192.168.7.246/detecion_semaforos')
 
 # SQLALCHEMY_DATABASE_URL = "postgresql://postgres:password@localhost/prueba" 
 # engine = create_engine(SQLALCHEMY_DATABASE_URL)
@@ -179,23 +179,23 @@ def obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion):
     with open(ruta_configuracion, 'r') as f:
         config = yaml.safe_load(f)
         fuente = config.get('video', {}).get('fuente', None)
-        if fuente:
-            # Verificar si la fuente es una URL RTSP
-            if fuente.startswith('rtsp://'):
-                # Extraer la parte de la URL que contiene la IP y el puerto
-                inicio_ip = fuente.find('@') + 1
-                final_ip = fuente.find(':', inicio_ip)
-                ip_camara = fuente[inicio_ip:final_ip]
-                # Extraer el puerto de la URL RTSP
-                inicio_puerto = final_ip + 1
-                final_puerto = fuente.find('/', inicio_puerto)
-                puerto_camara = fuente[inicio_puerto:final_puerto]
-                # print('Puerto:',puerto_camara)
-                return ip_camara, puerto_camara
-            else:
-                raise ValueError("La fuente no es una URL RTSP válida.")
-        else:
-            raise ValueError("La fuente no está especificada en el archivo de configuración.")
+        # if fuente:
+        #     # Verificar si la fuente es una URL RTSP
+        #     if fuente.startswith('rtsp://'):
+        #         # Extraer la parte de la URL que contiene la IP y el puerto
+        #         inicio_ip = fuente.find('@') + 1
+        #         final_ip = fuente.find(':', inicio_ip)
+        #         ip_camara = fuente[inicio_ip:final_ip]
+        #         # Extraer el puerto de la URL RTSP
+        #         inicio_puerto = final_ip + 1
+        #         final_puerto = fuente.find('/', inicio_puerto)
+        #         puerto_camara = fuente[inicio_puerto:final_puerto]
+        #         # print('Puerto:',puerto_camara)
+        #         return ip_camara, puerto_camara
+        #     else:
+        #         raise ValueError("La fuente no es una URL RTSP válida.")
+        # else:
+        #     raise ValueError("La fuente no está especificada en el archivo de configuración.")
 
 
 @app.get("/plate_cameras/")
@@ -266,8 +266,8 @@ async def save_plate(plate_foto: np.ndarray, alpr: ALPR, count: int):
         plate_number = alpr.plate
         
         if len(plate_number) >= 6:  # Validación de longitud mínima de placa
-            ip_camera = obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion)[0]
-            nueva_entrada = PlateCamera(id=str(count), placa=plate_number, camara=ip_camera)
+            # ip_camera = obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion)[0]
+            nueva_entrada = PlateCamera(id=str(count), placa=plate_number, camara=192192912, interseccion="JACINTO LARA") 
             session.add(nueva_entrada)
             session.commit()
 

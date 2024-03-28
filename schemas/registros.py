@@ -3,9 +3,10 @@ from datetime import datetime
 from typing import List
 
 class RegistroBody(BaseModel):
-    camara: int
+    camara: str
     placa: str
     imagen: str
+    interseccion: str
 
 class RegistroDates(BaseModel):
     init: datetime
@@ -13,11 +14,13 @@ class RegistroDates(BaseModel):
 
 class RegistroBaseResponse(BaseModel):
     id: int
-    camara: int
+    # camara: int
+    camara: str
     placa: str
-    imagen: str
+    interseccion: str
+    # imagen: str
     momento: datetime
-    fecha: datetime
+    # fecha: datetime
 
 
 class RegistroResponse(BaseModel):

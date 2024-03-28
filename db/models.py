@@ -11,6 +11,8 @@ class Plate(Base):
     infraction=Column(Boolean, default=False)
     created_at=Column(Date, default=datetime.now())
     camera_ip=Column(String,nullable=False)
+    interseccion=Column(String,nullable=False)
+    
 
 
     def __repr__(self):
