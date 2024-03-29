@@ -1,4 +1,7 @@
 import os
+import pandas as pd
+from tracker import Tracker
+import time
 import hashlib
 # Mostrar solo errores de TensorFlow
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -44,6 +47,25 @@ import tempfile
 # import ffmpeg
 from PIL import Image
 # import easyocr
+from ultralytics import YOLO
+model = YOLO('yolov8s.pt')
+tracker = Tracker()
+
+
+my_file = open(r"./coco.txt", "r")
+data = my_file.read()
+class_list = data.split("\n")
+
+# Clases de interés
+classes_of_interest = ["bus", "truck", "car"]
+
+cy1 = 322
+cy2 = 368
+offset = 6
+
+vh_down = {}
+vh_up = {}
+
 
 # Define el modelo base
 Base = declarative_base()
@@ -60,7 +82,7 @@ class PlateCamera(Base):
     
     
 # Configura la conexión a la base de datos PostgreSQL
-engine = create_engine('postgresql://postgres:123456@localhost/otra_prueba')
+engine = create_engine('postgresql://postgres:password@localhost/otra_prueba')
 # engine = create_engine('postgresql://postgres:123456@192.168.7.246/detecion_semaforos')
 
 # SQLALCHEMY_DATABASE_URL = "postgresql://postgres:password@localhost/prueba" 
@@ -330,11 +352,71 @@ async def gen_frames(cfg):
                     placas.pop(0)
                     
                 placas.append(alpr.plate)
+                
+            results = model.predict(frame)
+            a = results[0].boxes.data
+            px = pd.DataFrame(a).astype("float")
+            list = []
+            
+            
+            for index, row in px.iterrows():
+                x1 = int(row[0])
+                y1 = int(row[1])
+                x2 = int(row[2])
+                y2 = int(row[3])
+                d = int(row[5])
+                c = class_list[d]
+                if c in classes_of_interest:
+                    list.append([x1, y1, x2, y2])
+                
+                bbox_id = tracker.update(list)
+                for bbox in bbox_id:
+                    x3, y3, x4, y4, id = bbox
+                    cx = int(x3 + x4) // 2
+                    cy = int(y3 + y4) // 2
+                    
+                    cv2.rectangle(frame, (x3, y3), (x4, y4), (0, 0, 255), 2)
+                    cv2.putText(frame, str(id), (x3, y3), cv2.FONT_HERSHEY_COMPLEX, 0.6, (0, 255, 255), 2)
+                    
+                    if cy1 < (cy + offset) and cy1 > (cy - offset):
+                        vh_down[id] = time.time()
+                        if id not in vh_up:
+                            vh_up[id] = False
+                    
+                    if id in vh_down and not vh_up[id]:
+                        if cy2 < (cy + offset) and cy2 > (cy - offset):
+                            elapsed_time = time.time() - vh_down[id]
+                            distance = 10  # meters
+                            a_speed_ms = distance / elapsed_time
+                            a_speed_kh = a_speed_ms * 3.6
+                            vh_up[id] = True
+                            
+                            cv2.rectangle(frame, (cx, cy), 4, (0, 0, 255), -1)
+                            cv2.putText(frame, str(id), (x3, y3), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 1.5)
+            
+            plate_foto, total_time = alpr.mostrar_predicts(frame)
+
+             # Verificar si la placa ya está en el diccionario
+            if alpr.plate in placas:
+                # Si la placa ya está en el diccionario, no necesitamos hacer nada más
+                pass
+            else:
+                # Si la placa es nueva, la agregamos al diccionario con su ID correspondiente
+                
+                #placas[alpr.plate] = count
+                if len(placas) == 100:
+                    placas.pop(0)
+                    
+                placas.append(alpr.plate)        
                 # count = len(placas)
                 # placas.append("Nueva placa")
                 #count += 1
                 print('Placas Detectadas: ', len(placas))
+                
+                # Mostrar los IDs de las detecciones en la parte inferior del frame
+                cv2.putText(frame, f'Vehiculos: {id}', (50, frame.shape[0] - 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
                 # print("Contador:", count)
+                
                 
                 
                 # Función para guardar las placas en la base de datos
