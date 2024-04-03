@@ -17,7 +17,7 @@ video:
 
      # ''
     #Camaras operativas:
-    ## 'rtsp://admin:Vt3lc4123@38.51.120.236:8061'
+#    fuente: 'rtsp://admin:Vt3lc4123@38.51.120.236:8061'
     ## 'rtsp://admin:Vt3lc4123@38.51.120.236:8062'
     ## 'rtsp://admin:Vt3lc4123@38.51.120.236:8063'
     ## 'rtsp://admin:Vt3lc4123@38.51.120.236:8064'

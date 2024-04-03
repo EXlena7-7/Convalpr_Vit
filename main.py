@@ -124,7 +124,19 @@ def get_last_plate_numbers():
         # plate_numbers = db.query(PlateCamera.plate_number).order_by(desc(PlateCamera.created_at)).limit(5).all()
         plate_numbers = db.query(PlateCamera.placa).order_by(desc(PlateCamera.id)).limit(5).all()
         
+        print (plate_numbers)
+        
         return [plate_number[0] for plate_number in plate_numbers]
+    
+        # plate_numbers_flat = [plate_number[0] for plate_number in plate_numbers]
+
+# # Verificar si todos los números de placa son iguales
+# if len(set(plate_numbers_flat)) == 1:
+#     # Si todos son iguales, devolver una lista con un solo elemento
+#     return [plate_numbers_flat[0]]
+# else:
+#     # Si hay variación en los números de placa, devolver la lista completa
+#     return plate_numbers_flat
  
     finally:
         db.close()
@@ -340,17 +352,47 @@ async def gen_frames(cfg):
     CamGear  = VideoCapture(video_path)
     placas = []  # Diccionario para almacenar placas y sus IDs
     count = 0
+    vh_up={}
+    counter1=[]
+
+    tracker=Tracker()
 
     while True:
         try:
             # stream = VideoCapture(video_path)
             await asyncio.sleep(0.30)
             frame = CamGear.read()
+            count += 1
+            if count % 3 != 0:
+                continue
+            
+            cy1=500
+            cy2=668
+            offset=6
+
+            vh_down={}
+            counter=[]
+
+            vh_up={}
+            counter1=[]
+            offset=6
+            # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            # frame = stream.read()
+            # Definir ROI
+            x = 520
+            y = 220
+            w = 1900
+            h = 1050
+            # Extraer ROI
+            roi = frame[y:y+h, x:x+w].copy()
+            carros_cont=[]
+            personas_cont=[]
+            results=model.predict(roi)
 
             # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             # frame = stream.read()
 
-            plate_foto, total_time = alpr.mostrar_predicts(frame)
+            plate_foto, total_time = alpr.mostrar_predicts(roi)
 
              # Verificar si la placa ya está en el diccionario
             if alpr.plate in placas:
@@ -370,43 +412,128 @@ async def gen_frames(cfg):
             px = pd.DataFrame(a).astype("float")
             list = []
             
+            for numero in results[0].boxes.cls:
+            # Incrementar el conteo del número actua
+                if numero==2:
+                #    print('222')
+                    carros_cont.append(numero)
+                elif numero==0:
+                    personas_cont.append(numero)
+            carros_cont=len(carros_cont)
+            personas_cont=len(personas_cont)
+            results = model.predict(roi)
             
-            for index, row in px.iterrows():
-                x1 = int(row[0])
-                y1 = int(row[1])
-                x2 = int(row[2])
-                y2 = int(row[3])
-                d = int(row[5])
-                c = class_list[d]
-                if c in classes_of_interest:
-                    list.append([x1, y1, x2, y2])
+            a=results[0].boxes.data
+            px=pd.DataFrame(a).astype("float")
+            # cv2.rectangle(roi, (x, y), (x+w, y+h), (255, 0, 0), 2)
+        #    print(px)
+            list=[]
+            for index,row in px.iterrows():
+                x1=int(row[0])
+                y1=int(row[1])
+                x2=int(row[2])
+                y2=int(row[3])
+                d=int(row[5])
+                c=class_list[d]
+                if 'car' in c:
+                    list.append([x1,y1,x2,y2])
+            bbox_id=tracker.update(list)
+            for bbox in bbox_id:
+                x3,y3,x4,y4,id=bbox
+                cx=int(x3+x4)//2
+                cy=int(y3+y4)//2
+        
+                cv2.rectangle(roi,(x3,y3),(x4,y4),(0,255,255),3)
+            
+            
+                if cy1<(cy+offset) and cy1 > (cy-offset):
+                    vh_down[id]=time.time()
+                if id in vh_down:
+                    if cy2<(cy+offset) and cy2 > (cy-offset):
+                        elapsed_time=time.time() - vh_down[id]
+                    if counter.count(id)==0:
+                        counter.append(id)
+                        distance = 10 # meters
+                        a_speed_ms = distance / elapsed_time
+                        a_speed_kh = a_speed_ms * 3.6
+                        cv2.circle(frame,(cx,cy),4,(0,0,255),-1)
+                        cv2.putText(frame,str(id),(x3,y3),cv2.FONT_HERSHEY_COMPLEX,0.6,(255,255,255),2)
+                        cv2.putText(frame,str(int(a_speed_kh))+'Km/h',(x4,y4 ),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),2)
+
+                if cy2<(cy+offset) and cy2 > (cy-offset):
+                    vh_up[id]=time.time()
+                if id in vh_up:
+                    if cy1<(cy+offset) and cy1 > (cy-offset):
+                        elapsed1_time=time.time() - vh_up[id]
+                    
+                    if  counter1.count(id)==0:
+                        counter1.append(id)      
+                        distance1 = 10 # meters
+                        a_speed_ms1 = distance1 / elapsed1_time
+                        a_speed_kh1 = a_speed_ms1 * 3.6
+                        cv2.circle(frame,(cx,cy),4,(0,0,255),-1)
+                        cv2.putText(frame,str(id),(x3,y3),cv2.FONT_HERSHEY_COMPLEX,0.6,(255,255,255),2)
+                        cv2.putText(frame,str(int(a_speed_kh1))+'Km/h',(x4,y4),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),2)
+
+            cv2.line(roi,(170,cy1),(1900,cy1),(255,255,255),3)
+
+            # cv2.putText(roi,('L1'),(260,180),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),4)
+
+            # cv2.line(roi,(177,cy2),(1927,cy2),(255,255,255),4)
+            
+            # cv2.putText(roi,('L2'),(282,367),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),4)
+            d=(len(counter))
+            u=(len(counter1))
+            # cv2.putText(frame,('goingdown:-')+str(d),(60,90),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),4)
+
+            # cv2.putText(frame,('goingup:-')+str(u),(60,130),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),2)
+            # area de reportes:
+            
+            cv2.putText(frame,('vehiculos: -> ')+str(carros_cont),(60,90),cv2.FONT_HERSHEY_COMPLEX,1.4,(0,255,255),3)
+            # cv2.putText(frame,('personas en area : -> ')+str(personas_cont),(60,790),cv2.FONT_HERSHEY_COMPLEX,1.5,(0,0,255),3)
+            # # end
+            # ingresa el area procesada al frame principal
+            frame[y:y+h, x:x+w]=roi
+            cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
+            # frame=cv2.resize(frame,(1020,500))
+            # plate_foto, total_time = alpr.mostrar_predicts(frame)
+
+            # for index, row in px.iterrows():
+            #     x1 = int(row[0])
+            #     y1 = int(row[1])
+            #     x2 = int(row[2])
+            #     y2 = int(row[3])
+            #     d = int(row[5])
+            #     c = class_list[d]
+            #     if c in classes_of_interest:
+            #         list.append([x1, y1, x2, y2])
                 
-                bbox_id = tracker.update(list)
-                for bbox in bbox_id:
-                    x3, y3, x4, y4, id = bbox
-                    cx = int(x3 + x4) // 2
-                    cy = int(y3 + y4) // 2
+            #     bbox_id = tracker.update(list)
+            #     for bbox in bbox_id:
+            #         x3, y3, x4, y4, id = bbox
+            #         cx = int(x3 + x4) // 2
+            #         cy = int(y3 + y4) // 2
                     
-                    cv2.rectangle(frame, (x3, y3), (x4, y4), (0, 0, 255), 2)
-                    cv2.putText(frame, str(id), (x3, y3), cv2.FONT_HERSHEY_COMPLEX, 0.6, (0, 255, 255), 2)
+            #         cv2.rectangle(frame, (x3, y3), (x4, y4), (0, 0, 255), 2)
+            #         cv2.putText(frame, str(id), (x3, y3), cv2.FONT_HERSHEY_COMPLEX, 0.6, (0, 255, 255), 2)
                     
-                    if cy1 < (cy + offset) and cy1 > (cy - offset):
-                        vh_down[id] = time.time()
-                        if id not in vh_up:
-                            vh_up[id] = False
+            #         if cy1 < (cy + offset) and cy1 > (cy - offset):
+            #             vh_down[id] = time.time()
+            #             if id not in vh_up:
+            #                 vh_up[id] = False
                     
-                    if id in vh_down and not vh_up[id]:
-                        if cy2 < (cy + offset) and cy2 > (cy - offset):
-                            elapsed_time = time.time() - vh_down[id]
-                            distance = 10  # meters
-                            a_speed_ms = distance / elapsed_time
-                            a_speed_kh = a_speed_ms * 3.6
-                            vh_up[id] = True
+            #         if id in vh_down and not vh_up[id]:
+            #             if cy2 < (cy + offset) and cy2 > (cy - offset):
+            #                 elapsed_time = time.time() - vh_down[id]
+            #                 distance = 10  # meters
+            #                 a_speed_ms = distance / elapsed_time
+            #                 a_speed_kh = a_speed_ms * 3.6
+            #                 vh_up[id] = True
                             
-                            cv2.rectangle(frame, (cx, cy), 4, (0, 0, 255), -1)
-                            cv2.putText(frame, str(id), (x3, y3), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 1.5)
+            #                 cv2.rectangle(frame, (cx, cy), 4, (0, 0, 255), -1)
+            #                 cv2.putText(frame, str(id), (x3, y3), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 1.5)
             
-            plate_foto, total_time = alpr.mostrar_predicts(frame)
+            plate_foto, total_time = alpr.mostrar_predicts(roi)
 
              # Verificar si la placa ya está en el diccionario
             if alpr.plate in placas:
@@ -426,7 +553,7 @@ async def gen_frames(cfg):
                 print('Placas Detectadas: ', len(placas))
                 
                 # Mostrar los IDs de las detecciones en la parte inferior del frame
-                cv2.putText(frame, f'Vehiculos: {id}', (50, frame.shape[0] - 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+                #cv2.putText(frame, f'Vehiculos: {id}', (50, frame.shape[0] - 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
                 # print("Contador:", count)
                 
                 
