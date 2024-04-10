@@ -3,10 +3,8 @@ import pandas as pd
 from tracker import Tracker
 import time
 import hashlib
-# Mostrar solo errores de TensorFlow
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-# Desabilitar GPU ( correr en CPU )
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+import cvzone
+import itertools
 import sys
 from fastapi import FastAPI, Response, UploadFile, File
 from fastapi.responses import StreamingResponse
@@ -82,20 +80,22 @@ class PlateCamera(Base):
     
     
 # Configura la conexión a la base de datos PostgreSQL
-engine = create_engine('postgresql://postgres:123456@localhost/otra_prueba')
+engine = create_engine('postgresql://postgres:password@localhost/api')
 # engine = create_engine('postgresql://postgres:123456@192.168.7.246/detecion_semaforos')
 
 # SQLALCHEMY_DATABASE_URL = "postgresql://postgres:password@localhost/prueba" 
 # engine = create_engine(SQLALCHEMY_DATABASE_URL)
+
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Base = declarative_base()
+Base = declarative_base()
 
 
 # Crea todas las tablas definidas en los modelos en la base de datos
 Base.metadata.create_all(engine)
 
-# Crea una sesión de SQLAlchemy
+# # Crea una sesión de SQLAlchemy
 Session = sessionmaker(bind=engine)
 session = Session()
 
@@ -147,7 +147,7 @@ class Image(Base):
     id = Column(Integer, primary_key=True, index=True)
     file_name = Column(String, index=True)
 
-Base.metadata.create_all(bind=engine)
+# Base.metadata.create_all(bind=engine)
 
 arrayReconocidos = []
 # class ImageEventHandler(FileSystemEventHandler):
@@ -284,18 +284,6 @@ def return_images():
 def read_root():
     return {"Hello": "World"}
 
-
-# class GeneradorID:
-#     def __init__(self):
-#         self.contador = 0
-    
-#     def generar_id(self):
-#         self.contador += 1
-#         return self.contador
-    
-# generador = GeneradorID()
-# id_1 = generador.generar_id()
-
 async def save_plate(plate_foto: np.ndarray, alpr: ALPR, count: int):
     out_boxes, __, _, num_boxes = alpr.bboxes
     image_h, image_w, _ = plate_foto.shape
@@ -380,12 +368,12 @@ async def gen_frames(cfg):
             # frame = stream.read()
             # Definir ROI
             x = 520
-            y = 220
-            w = 1900
-            h = 1050
+            y = 500
+            w = 1990
+            h = 900
             # Extraer ROI
             roi = frame[y:y+h, x:x+w].copy()
-            carros_cont=[]
+            
             personas_cont=[]
             results=model.predict(roi)
 
@@ -412,15 +400,18 @@ async def gen_frames(cfg):
             px = pd.DataFrame(a).astype("float")
             list = []
             
+           # Inicializa el contador de vehículos
+            carros_cont=[]
             for numero in results[0].boxes.cls:
             # Incrementar el conteo del número actua
                 if numero==2:
                 #    print('222')
-                    carros_cont.append(numero)
-                elif numero==0:
-                    personas_cont.append(numero)
+                #    carros_cont += 1
+                   carros_cont.append(numero)
+                # elif numero==0:
+                #     personas_cont.append(numero)
             carros_cont=len(carros_cont)
-            personas_cont=len(personas_cont)
+            # personas_cont=len(personas_cont)
             results = model.predict(roi)
             
             a=results[0].boxes.data
@@ -435,7 +426,7 @@ async def gen_frames(cfg):
                 y2=int(row[3])
                 d=int(row[5])
                 c=class_list[d]
-                if 'car' in c:
+                if "bus" in c or "truck" in c or "car" in c:
                     list.append([x1,y1,x2,y2])
             bbox_id=tracker.update(list)
             for bbox in bbox_id:
@@ -443,37 +434,14 @@ async def gen_frames(cfg):
                 cx=int(x3+x4)//2
                 cy=int(y3+y4)//2
         
-                cv2.rectangle(roi,(x3,y3),(x4,y4),(0,255,255),3)
+                cv2.rectangle(roi,(x3,y3),(x4,y4),(0,255,255),2)
             
             
                 if cy1<(cy+offset) and cy1 > (cy-offset):
                     vh_down[id]=time.time()
                 if id in vh_down:
                     if cy2<(cy+offset) and cy2 > (cy-offset):
-                        elapsed_time=time.time() - vh_down[id]
-                    if counter.count(id)==0:
                         counter.append(id)
-                        distance = 10 # meters
-                        a_speed_ms = distance / elapsed_time
-                        a_speed_kh = a_speed_ms * 3.6
-                        cv2.circle(frame,(cx,cy),4,(0,0,255),-1)
-                        cv2.putText(frame,str(id),(x3,y3),cv2.FONT_HERSHEY_COMPLEX,0.6,(255,255,255),2)
-                        cv2.putText(frame,str(int(a_speed_kh))+'Km/h',(x4,y4 ),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),2)
-
-                if cy2<(cy+offset) and cy2 > (cy-offset):
-                    vh_up[id]=time.time()
-                if id in vh_up:
-                    if cy1<(cy+offset) and cy1 > (cy-offset):
-                        elapsed1_time=time.time() - vh_up[id]
-                    
-                    if  counter1.count(id)==0:
-                        counter1.append(id)      
-                        distance1 = 10 # meters
-                        a_speed_ms1 = distance1 / elapsed1_time
-                        a_speed_kh1 = a_speed_ms1 * 3.6
-                        cv2.circle(frame,(cx,cy),4,(0,0,255),-1)
-                        cv2.putText(frame,str(id),(x3,y3),cv2.FONT_HERSHEY_COMPLEX,0.6,(255,255,255),2)
-                        cv2.putText(frame,str(int(a_speed_kh1))+'Km/h',(x4,y4),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),2)
 
             cv2.line(roi,(170,cy1),(1900,cy1),(255,255,255),3)
 
@@ -489,50 +457,15 @@ async def gen_frames(cfg):
             # cv2.putText(frame,('goingup:-')+str(u),(60,130),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),2)
             # area de reportes:
             
-            cv2.putText(frame,('vehiculos: -> ')+str(carros_cont),(60,90),cv2.FONT_HERSHEY_COMPLEX,1.4,(0,255,255),3)
+            # cv2.putText(frame,('vehiculos: -> ')+str(carros_cont),(80,109),cv2.FONT_HERSHEY_COMPLEX,1.4,(255,0,0),3)
+            cvzone.putTextRect(frame,f'Total Vehicles ={str(carros_cont)}',[290,34],thickness=4,scale=2.3,border=2)
             # cv2.putText(frame,('personas en area : -> ')+str(personas_cont),(60,790),cv2.FONT_HERSHEY_COMPLEX,1.5,(0,0,255),3)
             # # end
             # ingresa el area procesada al frame principal
             frame[y:y+h, x:x+w]=roi
             cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
-            # frame=cv2.resize(frame,(1020,500))
-            # plate_foto, total_time = alpr.mostrar_predicts(frame)
 
-            # for index, row in px.iterrows():
-            #     x1 = int(row[0])
-            #     y1 = int(row[1])
-            #     x2 = int(row[2])
-            #     y2 = int(row[3])
-            #     d = int(row[5])
-            #     c = class_list[d]
-            #     if c in classes_of_interest:
-            #         list.append([x1, y1, x2, y2])
-                
-            #     bbox_id = tracker.update(list)
-            #     for bbox in bbox_id:
-            #         x3, y3, x4, y4, id = bbox
-            #         cx = int(x3 + x4) // 2
-            #         cy = int(y3 + y4) // 2
-                    
-            #         cv2.rectangle(frame, (x3, y3), (x4, y4), (0, 0, 255), 2)
-            #         cv2.putText(frame, str(id), (x3, y3), cv2.FONT_HERSHEY_COMPLEX, 0.6, (0, 255, 255), 2)
-                    
-            #         if cy1 < (cy + offset) and cy1 > (cy - offset):
-            #             vh_down[id] = time.time()
-            #             if id not in vh_up:
-            #                 vh_up[id] = False
-                    
-            #         if id in vh_down and not vh_up[id]:
-            #             if cy2 < (cy + offset) and cy2 > (cy - offset):
-            #                 elapsed_time = time.time() - vh_down[id]
-            #                 distance = 10  # meters
-            #                 a_speed_ms = distance / elapsed_time
-            #                 a_speed_kh = a_speed_ms * 3.6
-            #                 vh_up[id] = True
-                            
-            #                 cv2.rectangle(frame, (cx, cy), 4, (0, 0, 255), -1)
-            #                 cv2.putText(frame, str(id), (x3, y3), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 1.5)
-            
+            # plate_foto, total_time = alpr.mostrar_predicts(frame)
             plate_foto, total_time = alpr.mostrar_predicts(roi)
 
              # Verificar si la placa ya está en el diccionario
