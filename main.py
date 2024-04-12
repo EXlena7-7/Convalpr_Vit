@@ -1,6 +1,9 @@
+import cv2
 import os
 import pandas as pd
 from tracker import Tracker
+from sort import *
+import math
 import time
 import hashlib
 import cvzone
@@ -23,8 +26,6 @@ import yaml
 from services.video_capture import VideoCapture
 import logging
 from timeit import default_timer as timer
-import cv2
-import tempfile
 from datetime import datetime
 fechaActual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 from fastapi import FastAPI
@@ -47,16 +48,20 @@ from PIL import Image
 # import easyocr
 from ultralytics import YOLO
 model = YOLO('yolov8s.pt')
-tracker = Tracker()
+# tracker = Tracker()
+# my_file = open(r"./coco.txt", "r")
+# data = my_file.read()
+# class_list = data.split("\n")
 
+# # Clases de interés
+# classes_of_interest = ["bus", "truck", "car"]
 
-my_file = open(r"./coco.txt", "r")
-data = my_file.read()
-class_list = data.split("\n")
+classnames  = []
+with open('classes.txt','r') as f:
+    classnames = f.read().splitlines()
 
-# Clases de interés
-classes_of_interest = ["bus", "truck", "car"]
-
+tracker = Sort(max_age=20)
+line = [100, 550, 2900, 550]
 cy1 = 322
 cy2 = 368
 offset = 6
@@ -128,16 +133,7 @@ def get_last_plate_numbers():
         
         return [plate_number[0] for plate_number in plate_numbers]
     
-        # plate_numbers_flat = [plate_number[0] for plate_number in plate_numbers]
 
-# # Verificar si todos los números de placa son iguales
-# if len(set(plate_numbers_flat)) == 1:
-#     # Si todos son iguales, devolver una lista con un solo elemento
-#     return [plate_numbers_flat[0]]
-# else:
-#     # Si hay variación en los números de placa, devolver la lista completa
-#     return plate_numbers_flat
- 
     finally:
         db.close()
         
@@ -150,42 +146,7 @@ class Image(Base):
 # Base.metadata.create_all(bind=engine)
 
 arrayReconocidos = []
-# class ImageEventHandler(FileSystemEventHandler):
 
-#     image_path = os.path.join(os.path.dirname(__file__), 'plates')
-#     hash_dict = {}
-#     def on_created(self, event):
-#         if not event.is_directory:
-        
-#             # Apply OCR to the new image
-#             image_path = event.src_path
-            
-#             # Aqui es la lectura de la imagen 
-#             image = cv2.imread(image_path)
-
-
-
-# def save_temp_file(file_content: bytes, callback: callable):
-#     # Crear un archivo temporal en la carpeta 'plates' y eliminarlo automáticamente después de su uso
-#     with tempfile.NamedTemporaryFile(suffix=".jpg", delete=True, dir="plates") as temp_file:
-#         # Escribir el contenido del archivo en el archivo temporal
-#         temp_file.write(file_content)
-#         temp_file.flush()
-
-#         # Obtener la ruta del archivo temporal
-#         temp_path = temp_file.name
-
-#         # Llamar a la función de callback con la ruta del archivo temporal
-#         return callback(temp_path)
-
-# # Ejemplo de uso
-# def callback_function(file_path):
-#     print("La imagen se guardó temporalmente en:", file_path)
-#     # Aquí puedes hacer cualquier cosa con la imagen
-#     # Por ejemplo, cargarla, procesarla, etc.
-
-# # Llamada a la función save_temp_file con algún contenido de archivo y la función de callback
-# save_temp_file(b'Contenido de la imagen', callback_function)
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
@@ -305,21 +266,6 @@ async def save_plate(plate_foto: np.ndarray, alpr: ALPR, count: int):
             session.add(nueva_entrada)
             session.commit()
 
-        # image = cv2.imencode('.jpg', new_frame)[1].tobytes()
-
-        # frame_name = 'plates\plate_{}.jpg'.format(count)
-        # print(frame_name)
-        # # cv2.imshow("plate", image)
-        # image = cv2.imwrite(frame_name,new_frame)
-        # valor = alpr.mostrar_predicts(frame_name)
-        # if ( valor == False ) :
-        #     try:
-        #         os.remove(frame_name)
-        #         print('hora')
-        #     except FileNotFoundError:    
-        #         print('El archivo no se encontro')
-
-
 async def resize_frame_to_bytes(frame: cv2.Mat):
     # Obtén las dimensiones originales del frame
     height, width, _ = frame.shape
@@ -339,12 +285,21 @@ async def gen_frames(cfg):
     video_path = cfg['video']['fuente']
     CamGear  = VideoCapture(video_path)
     placas = []  # Diccionario para almacenar placas y sus IDs
-    count = 0
-    vh_up={}
-    counter1=[]
-
-    tracker=Tracker()
-
+    counter = []
+    count=0
+    cy1=500
+    cy2=668
+    offset=6
+    # vh_up={}
+    # counter1=[]
+    x = 520
+    y = 500
+    w = 1990
+    h = 900
+    # # Extraer ROI
+    # roi = frame[y:y+h, x:x+w].copy()
+    # tracker=Tracker()
+    
     while True:
         try:
             # stream = VideoCapture(video_path)
@@ -353,36 +308,8 @@ async def gen_frames(cfg):
             count += 1
             if count % 3 != 0:
                 continue
+            plate_foto, total_time = alpr.mostrar_predicts(frame)
             
-            cy1=500
-            cy2=668
-            offset=6
-
-            vh_down={}
-            counter=[]
-
-            vh_up={}
-            counter1=[]
-            offset=6
-            # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            # frame = stream.read()
-            # Definir ROI
-            x = 520
-            y = 500
-            w = 1990
-            h = 900
-            # Extraer ROI
-            roi = frame[y:y+h, x:x+w].copy()
-            
-            personas_cont=[]
-            results=model.predict(roi)
-
-            # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            # frame = stream.read()
-
-            plate_foto, total_time = alpr.mostrar_predicts(roi)
-
-             # Verificar si la placa ya está en el diccionario
             if alpr.plate in placas:
                 # Si la placa ya está en el diccionario, no necesitamos hacer nada más
                 pass
@@ -394,109 +321,155 @@ async def gen_frames(cfg):
                     placas.pop(0)
                     
                 placas.append(alpr.plate)
+                print('Placas Detectadas: ', len(placas))
+            detections = np.empty((0,5))
+            result = model(frame,stream=1)
+            for info in result:
+                boxes = info.boxes
+                for box in boxes:
+                    x1,y1,x2,y2 = box.xyxy[0]
+                    conf = box.conf[0]
+                    classindex = box.cls[0]
+                    conf = math.ceil(conf * 100)
+                    classindex = int(classindex)
+                    objectdetect = classnames[classindex]
+
+                    if objectdetect == 'car' or objectdetect == 'bus' or objectdetect =='truck' and conf >60:
+                        x1,y1,x2,y2 = int(x1),int(y1),int(x2),int(y2)
+                        new_detections = np.array([x1,y1,x2,y2,conf])
+                        detections = np.vstack((detections,new_detections))
+                        track_result = tracker.update(detections)
+                        cv2.line(frame,(line[0],line[1]),(line[2],line[3]),(255,255,255),7)
+
+            for results in track_result:
+                x1,y1,x2,y2,id = results
+                x1, y1, x2, y2, id = int(x1), int(y1), int(x2), int(y2),int(id)
+
+                w,h = x2-x1,y2-y1
+                cx,cy = x1+w//2 , y1+h//2
+
+                cv2.circle(frame,(cx,cy),6,(0,0,255),-1)
                 
-            results = model.predict(frame)
-            a = results[0].boxes.data
-            px = pd.DataFrame(a).astype("float")
-            list = []
-            
-           # Inicializa el contador de vehículos
-            carros_cont=[]
-            for numero in results[0].boxes.cls:
-            # Incrementar el conteo del número actua
-                if numero==2:
-                #    print('222')
-                #    carros_cont += 1
-                   carros_cont.append(numero)
-                # elif numero==0:
-                #     personas_cont.append(numero)
-            carros_cont=len(carros_cont)
-            # personas_cont=len(personas_cont)
-            results = model.predict(roi)
-            
-            a=results[0].boxes.data
-            px=pd.DataFrame(a).astype("float")
-            # cv2.rectangle(roi, (x, y), (x+w, y+h), (255, 0, 0), 2)
-        #    print(px)
-            list=[]
-            for index,row in px.iterrows():
-                x1=int(row[0])
-                y1=int(row[1])
-                x2=int(row[2])
-                y2=int(row[3])
-                d=int(row[5])
-                c=class_list[d]
-                if "bus" in c or "truck" in c or "car" in c:
-                    list.append([x1,y1,x2,y2])
-            bbox_id=tracker.update(list)
-            for bbox in bbox_id:
-                x3,y3,x4,y4,id=bbox
-                cx=int(x3+x4)//2
-                cy=int(y3+y4)//2
-        
-                cv2.rectangle(roi,(x3,y3),(x4,y4),(0,255,255),2)
-            
-            
-                if cy1<(cy+offset) and cy1 > (cy-offset):
-                    vh_down[id]=time.time()
-                if id in vh_down:
-                    if cy2<(cy+offset) and cy2 > (cy-offset):
+                cv2.rectangle(frame,(x1,y1),(x2,y2),(0,255,255),2)
+                
+                cvzone.putTextRect(frame,f'{id}',
+                                [x1+8,y1-12],thickness=2,scale=1.5)
+
+                if line[0] < cx <line[2] and line[1] -20 <cy <line[1]+20:
+                    cv2.line(frame, (line[0], line[1]), (line[2], line[3]), (0, 0, 255), 15)
+                    if counter.count(id) == 0:
                         counter.append(id)
+            cvzone.putTextRect(frame,f'Total Vehicles ={len(counter)}',[290,34],thickness=4,scale=2.3,border=2)
 
-            cv2.line(roi,(170,cy1),(1900,cy1),(255,255,255),3)
+            # vh_down={}
+            # counter=[]
 
-            # cv2.putText(roi,('L1'),(260,180),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),4)
+            # vh_up={}
+            # counter1=[]
+            # offset=6
+            # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            # frame = stream.read()
+            # Definir ROI
 
-            # cv2.line(roi,(177,cy2),(1927,cy2),(255,255,255),4)
             
-            # cv2.putText(roi,('L2'),(282,367),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),4)
-            d=(len(counter))
-            u=(len(counter1))
-            # cv2.putText(frame,('goingdown:-')+str(d),(60,90),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),4)
-
-            # cv2.putText(frame,('goingup:-')+str(u),(60,130),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),2)
-            # area de reportes:
+            personas_cont=[]
             
-            # cv2.putText(frame,('vehiculos: -> ')+str(carros_cont),(80,109),cv2.FONT_HERSHEY_COMPLEX,1.4,(255,0,0),3)
-            cvzone.putTextRect(frame,f'Total Vehicles ={str(carros_cont)}',[290,34],thickness=4,scale=2.3,border=2)
+
+            # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            # frame = stream.read()
+
+           
+
+             # Verificar si la placa ya está en el diccionario
+           
+                
+        #     results = model.predict(frame)
+        #     a = results[0].boxes.data
+        #     px = pd.DataFrame(a).astype("float")
+        #     list = []
+            
+        #    # Inicializa el contador de vehículos
+        #     carros_cont=[]
+        #     for numero in results[0].boxes.cls:
+        #     # Incrementar el conteo del número actua
+        #         if numero==2:
+        #         #    print('222')
+        #         #    carros_cont += 1
+        #            carros_cont.append(numero)
+        #         # elif numero==0:
+        #         #     personas_cont.append(numero)
+        #     carros_cont=len(carros_cont)
+        #     # personas_cont=len(personas_cont)
+        #     results = model.predict(roi)
+            
+        #     a=results[0].boxes.data
+        #     px=pd.DataFrame(a).astype("float")
+        #     # cv2.rectangle(roi, (x, y), (x+w, y+h), (255, 0, 0), 2)
+        # #    print(px)
+        #     list=[]
+        #     for index,row in px.iterrows():
+        #         x1=int(row[0])
+        #         y1=int(row[1])
+        #         x2=int(row[2])
+        #         y2=int(row[3])
+        #         d=int(row[5])
+        #         c=class_list[d]
+        #         if "bus" in c or "truck" in c or "car" in c:
+        #             list.append([x1,y1,x2,y2])
+        #     bbox_id=tracker.update(list)
+        #     for bbox in bbox_id:
+        #         x3,y3,x4,y4,id=bbox
+        #         cx=int(x3+x4)//2
+        #         cy=int(y3+y4)//2
+        
+        #         cv2.rectangle(roi,(x3,y3),(x4,y4),(0,255,255),2)
+            
+            
+        #         if cy1<(cy+offset) and cy1 > (cy-offset):
+        #             vh_down[id]=time.time()
+        #         if id in vh_down:
+        #             if cy2<(cy+offset) and cy2 > (cy-offset):
+        #                 counter.append(id)
+
+        #     cv2.line(roi,(170,cy1),(1900,cy1),(255,255,255),3)
+
+            
+        #     d=(len(counter))
+        #     u=(len(counter1))
+            
+        #     cvzone.putTextRect(frame,f'Total Vehicles ={str(carros_cont)}',[290,34],thickness=4,scale=2.3,border=2)
             # cv2.putText(frame,('personas en area : -> ')+str(personas_cont),(60,790),cv2.FONT_HERSHEY_COMPLEX,1.5,(0,0,255),3)
             # # end
             # ingresa el area procesada al frame principal
-            frame[y:y+h, x:x+w]=roi
-            cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
+            # frame[y:y+h, x:x+w]=roi
+            # cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
 
+            # # plate_foto, total_time = alpr.mostrar_predicts(frame)
             # plate_foto, total_time = alpr.mostrar_predicts(frame)
-            plate_foto, total_time = alpr.mostrar_predicts(roi)
 
-             # Verificar si la placa ya está en el diccionario
-            if alpr.plate in placas:
-                # Si la placa ya está en el diccionario, no necesitamos hacer nada más
-                pass
-            else:
-                # Si la placa es nueva, la agregamos al diccionario con su ID correspondiente
+            #  # Verificar si la placa ya está en el diccionario
+            # if alpr.plate in placas:
+            #     # Si la placa ya está en el diccionario, no necesitamos hacer nada más
+            #     pass
+            # else:
+            #     # Si la placa es nueva, la agregamos al diccionario con su ID correspondiente
                 
-                #placas[alpr.plate] = count
-                if len(placas) == 100:
-                    placas.pop(0)
+            #     #placas[alpr.plate] = count
+            #     if len(placas) == 100:
+            #         placas.pop(0)
                     
-                placas.append(alpr.plate)        
-                # count = len(placas)
-                # placas.append("Nueva placa")
-                #count += 1
-                print('Placas Detectadas: ', len(placas))
+            #     placas.append(alpr.plate)        
                 
-                # Mostrar los IDs de las detecciones en la parte inferior del frame
-                #cv2.putText(frame, f'Vehiculos: {id}', (50, frame.shape[0] - 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
-                # print("Contador:", count)
                 
+               
                 
                 
                 # Función para guardar las placas en la base de datos
-                asyncio.ensure_future(save_plate(plate_foto, alpr, count))
+                # asyncio.ensure_future(save_plate(plate_foto, alpr, count))
                 
-                ruta_configuracion = "config.yaml"  # Ruta de tu archivo config.yaml
-                ip_camara = obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion)
-                print("CAMARA IP, puerto :", ip_camara)
+                # ruta_configuracion = "config.yaml"  # Ruta de tu archivo config.yaml
+                # ip_camara = obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion)
+                # print("CAMARA IP, puerto :", ip_camara)
 
             # count = count + 1
 
@@ -546,4 +519,3 @@ async def video_feed():
     except Exception as e:
         error_message = {"Cámara no encontrada": str(e)}
     return error_message
-
