@@ -1,15 +1,16 @@
 import cv2
 import os
+from camaras import *
+from camaras.init import *
+from db.coneccion import *
+from db.models import *
 import pandas as pd
-from tracker import Tracker
 from sort import *
 import math
 from data import *
 import time
 import hashlib
 import cvzone
-import itertools
-import sys
 from fastapi import FastAPI, Response, UploadFile, File
 from fastapi.responses import StreamingResponse
 from starlette.requests import Request
@@ -23,7 +24,7 @@ os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 import time
 from alpr.alpr import ALPR
 from argparse import ArgumentParser
-import yaml
+
 from services.video_capture import VideoCapture
 import logging
 from timeit import default_timer as timer
@@ -34,19 +35,9 @@ from fastapi.staticfiles import StaticFiles
 # from watchdog.observers import Observer
 # from watchdog.events import FileSystemEventHandler
 from fastapi.middleware.cors import CORSMiddleware
-
 from fastapi import FastAPI, HTTPException, Query
-from sqlalchemy import Column, Integer, String
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine, Column, Boolean, Integer, String, Float, DateTime, func
-from sqlalchemy import desc, asc
-from sqlalchemy.exc import OperationalError
-from sqlalchemy.ext.declarative import declarative_base
-from datetime import datetime
 import tempfile
-# import ffmpeg
 from PIL import Image
-# import easyocr
 from ultralytics import YOLO
 model = YOLO('yolov8s.pt')
 
@@ -55,47 +46,11 @@ classnames  = []
 with open('coco.txt','r') as f:
     classnames = f.read().splitlines()
 
-
+# funtions:
 tracker = Sort(max_age=20)
 line = [50, 550, 3900, 550]
 counter = []
 
-# funtions:
-
-
-# Define el modelo base
-Base = declarative_base()
-
-# Define la clase del modelo para la tabla de placas y cámaras
-class PlateCamera(Base):
-    __tablename__ = 'registros'
-    id = Column(Integer, primary_key=True, autoincrement=True, index=True, nullable=False, unique=True)
-    placa = Column(String)
-    # ip_camera = Column(String)
-    camara = Column(String)    
-    interseccion = Column(String)
-    momento = Column(DateTime, default=datetime.now)
-    
-    
-# Configura la conexión a la base de datos PostgreSQL
-engine = create_engine('postgresql://postgres:password@localhost/api')
-# engine = create_engine('postgresql://postgres:123456@192.168.7.246/detecion_semaforos')
-
-# SQLALCHEMY_DATABASE_URL = "postgresql://postgres:password@localhost/prueba" 
-# engine = create_engine(SQLALCHEMY_DATABASE_URL)
-
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base = declarative_base()
-
-
-# Crea todas las tablas definidas en los modelos en la base de datos
-Base.metadata.create_all(engine)
-
-# # Crea una sesión de SQLAlchemy
-Session = sessionmaker(bind=engine)
-session = Session()
 
 
 def get_plate_cameras(pag: int = 0, limit: int = 10):
@@ -131,13 +86,6 @@ def get_last_plate_numbers():
         db.close()
         
 
-class Image(Base):
-    __tablename__ = "images"
-    id = Column(Integer, primary_key=True, index=True)
-    file_name = Column(String, index=True)
-
-# Base.metadata.create_all(bind=engine)
-
 arrayReconocidos = []
 
 
@@ -158,32 +106,6 @@ app.add_middleware(
 )
 
 app.mount("/static", StaticFiles(directory="./plates"), name="static")
-
-ruta_configuracion = "config.yaml"
-
-
-
-def obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion):
-    with open(ruta_configuracion, 'r') as f:
-        config = yaml.safe_load(f)
-        fuente = config.get('video', {}).get('fuente', None)
-        if fuente:
-            # Verificar si la fuente es una URL RTSP
-            if fuente.startswith('rtsp://'):
-                # Extraer la parte de la URL que contiene la IP y el puerto
-                inicio_ip = fuente.find('@') + 1
-                final_ip = fuente.find(':', inicio_ip)
-                ip_camara = fuente[inicio_ip:final_ip]
-                # Extraer el puerto de la URL RTSP
-                inicio_puerto = final_ip + 1
-                final_puerto = fuente.find('/', inicio_puerto)
-                puerto_camara = fuente[inicio_puerto:final_puerto]
-                # print('Puerto:',puerto_camara)
-                return ip_camara, puerto_camara
-            else:
-                raise ValueError("La fuente no es una URL RTSP válida.")
-        else:
-            raise ValueError("La fuente no está especificada en el archivo de configuración.")
 
 
 @app.get("/plate_cameras/")
@@ -237,6 +159,35 @@ def return_images():
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
+def poligonDeInteres(frame):
+    img =frame.copy()
+
+    px1,py1,px2,py2,px3,py3,px4,py4 = conf_camara[0]['camara3']['poligono'].values()
+    print(px1)
+
+     # Definir los puntos iniciales del polígono (aquí puedes ajustar según tu necesidad)
+    poligonos = np.array([[px1, py1], [px2, py2], [px3, py3 ],[px4, py4]], np.int32)
+   #   # Dibujar el polígono en la imagen
+    
+   #  # Crear una máscara negra del mismo tamaño que la imagen original
+    mask = np.zeros_like(img)
+    
+   #  # Dibujar el polígono en la máscara
+    cv2.fillPoly(mask, [poligonos], (255, 255, 255))
+    
+   #  # Usar la máscara para dejar en negro el exterior del polígono en la imagen original
+    img[mask == 0] = 0
+    
+   #  # Dibujar el polígono en la imagen
+    cv2.polylines(frame, [poligonos], isClosed=True, color=(0, 255, 0), thickness=2)
+    # cv2.imshow('mascara', img)
+    if cv2.waitKey(1) & 0xFF == 27:
+        pass
+    # cv2.release()
+    # Mostrar la imagen con el polígono dibujado en pantalla
+    
+    # print('llego')
+    return img
 
 async def save_plate(plate_foto: np.ndarray, alpr: ALPR, count: int):
     out_boxes, __, _, num_boxes = alpr.bboxes
@@ -248,8 +199,11 @@ async def save_plate(plate_foto: np.ndarray, alpr: ALPR, count: int):
         x2 = int(coor[3] * image_w)
         y2 = int(coor[2] * image_h)
         new_frame = plate_foto.copy()[y1:y2, x1:x2]
-        
-        
+        # print('Que Diablos eres:',plate_foto)
+        # cv2.imshow('placa',new_frame)
+        # result2=poligonDeInteres(frame)
+        # cv2.rectangle(result2, (x1, y1), (x2, y2), (255, 0, 0), 2)
+        # new_frame, total_time = alpr.mostrar_predicts(result2)
         # Guardar los datos en la base de datos
         plate_number = alpr.plate
         
@@ -272,32 +226,6 @@ async def resize_frame_to_bytes(frame: cv2.Mat):
     _, buffer = cv2.imencode('.jpg', frame)
     return buffer.tobytes()
 
-def poligonDeInteres(frame):
-    img =frame.copy()
-
-    px1,py1,px2,py2,px3,py3,px4,py4 = conf_camara[0]['camara3']['poligono'].values()
-    print(px1)
-
-     # Definir los puntos iniciales del polígono (aquí puedes ajustar según tu necesidad)
-    poligonos = np.array([[px1, py1], [px2, py2], [px3, py3 ],[px4, py4]], np.int32)
-   #   # Dibujar el polígono en la imagen
-    
-   #  # Crear una máscara negra del mismo tamaño que la imagen original
-    mask = np.zeros_like(img)
-    
-   #  # Dibujar el polígono en la máscara
-    cv2.fillPoly(mask, [poligonos], (255, 255, 255))
-    
-   #  # Usar la máscara para dejar en negro el exterior del polígono en la imagen original
-    img[mask == 0] = 0
-    
-   #  # Dibujar el polígono en la imagen
-    cv2.polylines(frame, [poligonos], isClosed=True, color=(0, 255, 0), thickness=2)
-
-    # Mostrar la imagen con el polígono dibujado en pantalla
-    
-    # print('llego')
-    return img
 
 # def VehiclesInArea(array):
     # cvzone.putTextRect(frame,f'Vehiculos en Area ={len(array)}',[290,74],thickness=4,scale=2.3,border=2)
@@ -321,7 +249,9 @@ async def gen_frames(cfg):
                 continue
             detecciones=[]
             detections = np.empty((0,5))
+            # plate_foto, total_time = alpr.mostrar_predicts(frame)
             result2=poligonDeInteres(frame)
+            
             result = model(result2,stream=1)
             for info in result:
                 boxes = info.boxes
@@ -336,12 +266,18 @@ async def gen_frames(cfg):
                     conf = math.ceil(conf * 100)
                     classindex = int(classindex)
                     objectdetect = classnames[classindex]
-                    if objectdetect == 'car' or objectdetect == 'bus' or objectdetect =='truck' and conf >60:
+                    if objectdetect == 'car' or objectdetect == 'bus' or objectdetect =='truck' or objectdetect =='motorcycle' and conf >60:
                         x1,y1,x2,y2 = int(x1),int(y1),int(x2),int(y2)
                         new_detections = np.array([x1,y1,x2,y2,conf])
                         detections = np.vstack((detections,new_detections))
-                        plate_foto, total_time = alpr.mostrar_predicts(frame)
-
+                        #vamos hacer la prueba
+                        # print(f'frame {type(frame)} y frame poligono {type(result2)}')
+                      
+                    plate_foto, total_time = alpr.mostrar_predicts(frame)
+                    # print('Cafe:',list(rectangulo_placas))
+                    cv2.imshow('plate', plate_foto)
+                    # if cv2.waitKey(1) & 0xFF == 27:
+                    #         pass
                     track_result = tracker.update(detections)
                     cv2.line(frame,(line[0],line[1]),(line[2],line[3]),(0,255,255),7)
                     # Verificar si la placa ya está en el diccionario
@@ -356,29 +292,28 @@ async def gen_frames(cfg):
                             placas.pop(0)
                             placas.append(alpr.plate)  
     
+                for results in track_result:
+                    x1,y1,x2,y2,id = results
+                    x1, y1, x2, y2, id = int(x1), int(y1), int(x2), int(y2),int(id)
 
-            for results in track_result:
-                x1,y1,x2,y2,id = results
-                x1, y1, x2, y2, id = int(x1), int(y1), int(x2), int(y2),int(id)
+                    w,h = x2-x1,y2-y1
+                    cx,cy = x1+w//2 , y1+h//2
 
-                w,h = x2-x1,y2-y1
-                cx,cy = x1+w//2 , y1+h//2
+                    cv2.circle(frame,(cx,cy),6,(0,0,255),-1)
+                    cv2.rectangle(frame,(x1,y1),(x2,y2),(0,0,255),3)
+                    cvzone.putTextRect(frame,f'{id}',
+                                    [x1+8,y1-12],thickness=2,scale=1.5)
 
-                cv2.circle(frame,(cx,cy),6,(0,0,255),-1)
-                cv2.rectangle(frame,(x1,y1),(x2,y2),(0,255,0),3)
-                cvzone.putTextRect(frame,f'{id}',
-                                [x1+8,y1-12],thickness=2,scale=1.5)
-
-                if line[0] < cx <line[2] and line[1] -20 <cy <line[1]+20:
-                    cv2.line(frame, (line[0], line[1]), (line[2], line[3]), (0, 0, 255), 15)
-                    if counter.count(id) == 0:
-                        counter.append(id)
+                    if line[0] < cx <line[2] and line[1] -20 <cy <line[1]+20:
+                        cv2.line(frame, (line[0], line[1]), (line[2], line[3]), (0, 0, 255), 15)
+                        if counter.count(id) == 0:
+                            counter.append(id)
             cvzone.putTextRect(frame,f'Total Vehicles ={len(counter)}',[290,34],thickness=4,scale=2.3,border=2)
             
             # Función para guardar las placas en la base de datos
             asyncio.ensure_future(save_plate(plate_foto, alpr, count))
                 
-                # ruta_configuracion = "config.yaml"  # Ruta de tu archivo config.yaml
+            # ruta_configuracion = "config.yaml"  # Ruta de tu archivo config.yaml
             ip_camara = obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion)
             print("CAMARA IP, puerto :", ip_camara)
 
@@ -420,8 +355,7 @@ if __name__ == '__main__':
 @app.get("/video_feed/")
 async def video_feed():
     try:
-        
-        with open('config.yaml', 'r') as stream:
+        with open(r'config.yaml', 'r') as stream:
             cfg = yaml.safe_load(stream)
         return StreamingResponse(gen_frames(cfg), media_type="multipart/x-mixed-replace;boundary=frame")
 

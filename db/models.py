@@ -1,20 +1,25 @@
 
-from sqlalchemy import String, Boolean, Integer, Column, Date
+from sqlalchemy import String, Boolean, Integer, Column, DateTime
 from datetime import datetime
 
 from db.coneccion import Base
 
-class Plate(Base):
-    __tablename__='plates'
-    id=Column(Integer, primary_key=True, nullable=True)
-    number_plate=Column(String(20),nullable=False,unique=False)
-    infraction=Column(Boolean, default=False)
-    created_at=Column(Date, default=datetime.now())
-    camera_ip=Column(String,nullable=False)
-    interseccion=Column(String,nullable=False)
+
+# Define la clase del modelo para la tabla de placas y cámaras
+class PlateCamera(Base):
+    __tablename__ = 'registros'
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True, nullable=False, unique=True)
+    placa = Column(String)
+    # ip_camera = Column(String)
+    camara = Column(String)    
+    interseccion = Column(String)
+    momento = Column(DateTime, default=datetime.now)
     
+    
+class Image(Base):
+    __tablename__ = "images"
+    id = Column(Integer, primary_key=True, index=True)
+    file_name = Column(String, index=True)
 
 
-    def __repr__(self):
-        return f"<Plate number_plate={self.number_plate}>"
 

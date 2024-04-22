@@ -375,96 +375,96 @@ async def gen_frames(cfg):
             # Extraer ROI
             roi = frame[y:y+h, x:x+w].copy()
             
-            personas_cont=[]
-            results=model.predict(roi)
+        #     personas_cont=[]
+        #     results=model.predict(roi)
 
-            # frame = cv2.cvtColor(frasme, cv2.COLOR_BGR2RGB)
-            # frame = stream.read()
+        #     # frame = cv2.cvtColor(frasme, cv2.COLOR_BGR2RGB)
+        #     # frame = stream.read()
 
-            plate_foto, total_time = alpr.mostrar_predicts(roi)
+        #     plate_foto, total_time = alpr.mostrar_predicts(roi)
 
-             # Verificar si la placa ya está en el diccionario
-            if alpr.plate in placas:
-                # Si la placa ya está en el diccionario, no necesitamos hacer nada más
-                pass
-            else:
-                # Si la placa es nueva, la agregamos al diccionario con su ID correspondiente
+        #      # Verificar si la placa ya está en el diccionario
+        #     if alpr.plate in placas:
+        #         # Si la placa ya está en el diccionario, no necesitamos hacer nada más
+        #         pass
+        #     else:
+        #         # Si la placa es nueva, la agregamos al diccionario con su ID correspondiente
                 
-                #placas[alpr.plate] = count
-                if len(placas) == 50:
-                    placas.pop(0)
+        #         #placas[alpr.plate] = count
+        #         if len(placas) == 50:
+        #             placas.pop(0)
                     
-                placas.append(alpr.plate)
+        #         placas.append(alpr.plate)
                 
-            results = model.predict(frame)
-            a = results[0].boxes.data
-            px = pd.DataFrame(a).astype("float")
-            list = []
+        #     results = model.predict(frame)
+        #     a = results[0].boxes.data
+        #     px = pd.DataFrame(a).astype("float")
+        #     list = []
             
-           # Inicializa el contador de vehículos
-            carros_cont=[]
-            for numero in results[0].boxes.cls:
-            # Incrementar el conteo del número actua
-                if numero==2:
-                #    print('222')
-                #    carros_cont += 1
-                   carros_cont.append(numero)
-                # elif numero==0:
-                #     personas_cont.append(numero)
-            carros_cont=len(carros_cont)
-            # personas_cont=len(personas_cont)
-            results = model.predict(roi)
+        #    # Inicializa el contador de vehículos
+        #     carros_cont=[]
+        #     for numero in results[0].boxes.cls:
+        #     # Incrementar el conteo del número actua
+        #         if numero==2:
+        #         #    print('222')
+        #         #    carros_cont += 1
+        #            carros_cont.append(numero)
+        #         # elif numero==0:
+        #         #     personas_cont.append(numero)
+        #     carros_cont=len(carros_cont)
+        #     # personas_cont=len(personas_cont)
+        #     results = model.predict(roi)
             
-            a=results[0].boxes.data
-            px=pd.DataFrame(a).astype("float")
-            # cv2.rectangle(roi, (x, y), (x+w, y+h), (255, 0, 0), 2)
-        #    print(px)
-            list=[]
-            for index,row in px.iterrows():
-                x1=int(row[0])
-                y1=int(row[1])
-                x2=int(row[2])
-                y2=int(row[3])
-                d=int(row[5])
-                c=class_list[d]
-                if "bus" in c or "truck" in c or "car" in c:
-                    list.append([x1,y1,x2,y2])
-            bbox_id=tracker.update(list)
-            for bbox in bbox_id:
-                x3,y3,x4,y4,id=bbox
-                cx=int(x3+x4)//2
-                cy=int(y3+y4)//2
+        #     a=results[0].boxes.data
+        #     px=pd.DataFrame(a).astype("float")
+        #     # cv2.rectangle(roi, (x, y), (x+w, y+h), (255, 0, 0), 2)
+        # #    print(px)
+        #     list=[]
+        #     for index,row in px.iterrows():
+        #         x1=int(row[0])
+        #         y1=int(row[1])
+        #         x2=int(row[2])
+        #         y2=int(row[3])
+        #         d=int(row[5])
+        #         c=class_list[d]
+        #         if "bus" in c or "truck" in c or "car" in c:
+        #             list.append([x1,y1,x2,y2])
+        #     bbox_id=tracker.update(list)
+        #     for bbox in bbox_id:
+        #         x3,y3,x4,y4,id=bbox
+        #         cx=int(x3+x4)//2
+        #         cy=int(y3+y4)//2
         
-                cv2.rectangle(roi,(x3,y3),(x4,y4),(0,255,255),2)
+        #         cv2.rectangle(roi,(x3,y3),(x4,y4),(0,255,255),2)
             
             
-                if cy1<(cy+offset) and cy1 > (cy-offset):
-                    vh_down[id]=time.time()
-                if id in vh_down:
-                    if cy2<(cy+offset) and cy2 > (cy-offset):
-                        counter.append(id)
+        #         if cy1<(cy+offset) and cy1 > (cy-offset):
+        #             vh_down[id]=time.time()
+        #         if id in vh_down:
+        #             if cy2<(cy+offset) and cy2 > (cy-offset):
+        #                 counter.append(id)
 
-            cv2.line(roi,(170,cy1),(1900,cy1),(255,255,255),3)
+        #     cv2.line(roi,(170,cy1),(1900,cy1),(255,255,255),3)
 
-            # cv2.putText(roi,('L1'),(260,180),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),4)
+        #     # cv2.putText(roi,('L1'),(260,180),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),4)
 
-            # cv2.line(roi,(177,cy2),(1927,cy2),(255,255,255),4)
+        #     # cv2.line(roi,(177,cy2),(1927,cy2),(255,255,255),4)
             
-            # cv2.putText(roi,('L2'),(282,367),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),4)
-            d=(len(counter))
-            u=(len(counter1))
-            # cv2.putText(frame,('goingdown:-')+str(d),(60,90),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),4)
+        #     # cv2.putText(roi,('L2'),(282,367),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),4)
+        #     d=(len(counter))
+        #     u=(len(counter1))
+        #     # cv2.putText(frame,('goingdown:-')+str(d),(60,90),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),4)
 
-            # cv2.putText(frame,('goingup:-')+str(u),(60,130),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),2)
-            # area de reportes:
+        #     # cv2.putText(frame,('goingup:-')+str(u),(60,130),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),2)
+        #     # area de reportes:
             
-            # cv2.putText(frame,('vehiculos: -> ')+str(carros_cont),(80,109),cv2.FONT_HERSHEY_COMPLEX,1.4,(255,0,0),3)
-            cvzone.putTextRect(frame,f'Total Vehicles ={str(carros_cont)}',[290,34],thickness=4,scale=2.3,border=2)
-            # cv2.putText(frame,('personas en area : -> ')+str(personas_cont),(60,790),cv2.FONT_HERSHEY_COMPLEX,1.5,(0,0,255),3)
-            # # end
-            # ingresa el area procesada al frame principal
-            frame[y:y+h, x:x+w]=roi
-            cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
+        #     # cv2.putText(frame,('vehiculos: -> ')+str(carros_cont),(80,109),cv2.FONT_HERSHEY_COMPLEX,1.4,(255,0,0),3)
+        #     cvzone.putTextRect(frame,f'Total Vehicles ={str(carros_cont)}',[290,34],thickness=4,scale=2.3,border=2)
+        #     # cv2.putText(frame,('personas en area : -> ')+str(personas_cont),(60,790),cv2.FONT_HERSHEY_COMPLEX,1.5,(0,0,255),3)
+        #     # # end
+        #     # ingresa el area procesada al frame principal
+        #     frame[y:y+h, x:x+w]=roi
+        #     cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
 
             # plate_foto, total_time = alpr.mostrar_predicts(frame)
             plate_foto, total_time = alpr.mostrar_predicts(roi)
