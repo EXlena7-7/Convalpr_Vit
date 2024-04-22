@@ -9,7 +9,6 @@ from sort import *
 import math
 from data import *
 import time
-import hashlib
 import cvzone
 from fastapi import FastAPI, Response, UploadFile, File
 from fastapi.responses import StreamingResponse
