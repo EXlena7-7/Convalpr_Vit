@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from tracker import Tracker
+
 import time
 import hashlib
 import cvzone
@@ -48,6 +48,19 @@ from PIL import Image
 # import easyocr
 from ultralytics import YOLO
 model = YOLO('yolov8s.pt')
+from tracker import Tracker
+from sort import *
+import math
+from poligono import *
+classnames  = []
+with open('coco.txt','r') as f:
+    classnames = f.read().splitlines()
+
+# funtions:
+tracker = Sort(max_age=20)
+line = [50, 550, 3900, 550]
+counter = []
+
 tracker = Tracker()
 line = [100, 550, 2900, 550]
 
@@ -354,7 +367,6 @@ async def gen_frames(cfg):
             count += 1
             if count % 3 != 0:
                 continue
-            
             cy1=500
             cy2=668
             offset=6
@@ -374,100 +386,145 @@ async def gen_frames(cfg):
             h = 490
             # Extraer ROI
             roi = frame[y:y+h, x:x+w].copy()
-            
-        #     personas_cont=[]
-        #     results=model.predict(roi)
+            personas_cont=[]
+            results=model.predict(roi)
 
-        #     # frame = cv2.cvtColor(frasme, cv2.COLOR_BGR2RGB)
-        #     # frame = stream.read()
+            # frame = cv2.cvtColor(frasme, cv2.COLOR_BGR2RGB)
+            # frame = stream.read()
 
-        #     plate_foto, total_time = alpr.mostrar_predicts(roi)
+            plate_foto, total_time = alpr.mostrar_predicts(roi)
 
-        #      # Verificar si la placa ya está en el diccionario
-        #     if alpr.plate in placas:
-        #         # Si la placa ya está en el diccionario, no necesitamos hacer nada más
-        #         pass
-        #     else:
-        #         # Si la placa es nueva, la agregamos al diccionario con su ID correspondiente
+             # Verificar si la placa ya está en el diccionario
+            if alpr.plate in placas:
+                # Si la placa ya está en el diccionario, no necesitamos hacer nada más
+                pass
+            else:
+                # Si la placa es nueva, la agregamos al diccionario con su ID correspondiente
                 
-        #         #placas[alpr.plate] = count
-        #         if len(placas) == 50:
-        #             placas.pop(0)
+                #placas[alpr.plate] = count
+                if len(placas) == 50:
+                    placas.pop(0)
                     
-        #         placas.append(alpr.plate)
+                placas.append(alpr.plate)
                 
-        #     results = model.predict(frame)
-        #     a = results[0].boxes.data
-        #     px = pd.DataFrame(a).astype("float")
-        #     list = []
+            results = model.predict(frame)
+            a = results[0].boxes.data
+            px = pd.DataFrame(a).astype("float")
+            list = []
             
-        #    # Inicializa el contador de vehículos
-        #     carros_cont=[]
-        #     for numero in results[0].boxes.cls:
-        #     # Incrementar el conteo del número actua
-        #         if numero==2:
-        #         #    print('222')
-        #         #    carros_cont += 1
-        #            carros_cont.append(numero)
-        #         # elif numero==0:
-        #         #     personas_cont.append(numero)
-        #     carros_cont=len(carros_cont)
-        #     # personas_cont=len(personas_cont)
-        #     results = model.predict(roi)
+           # Inicializa el contador de vehículos
+            carros_cont=[]
+            for numero in results[0].boxes.cls:
+            # Incrementar el conteo del número actua
+                if numero==2:
+                #    print('222')
+                #    carros_cont += 1
+                   carros_cont.append(numero)
+                # elif numero==0:
+                #     personas_cont.append(numero)
+            carros_cont=len(carros_cont)
+            # personas_cont=len(personas_cont)
+            results = model.predict(roi)
             
-        #     a=results[0].boxes.data
-        #     px=pd.DataFrame(a).astype("float")
-        #     # cv2.rectangle(roi, (x, y), (x+w, y+h), (255, 0, 0), 2)
-        # #    print(px)
-        #     list=[]
-        #     for index,row in px.iterrows():
-        #         x1=int(row[0])
-        #         y1=int(row[1])
-        #         x2=int(row[2])
-        #         y2=int(row[3])
-        #         d=int(row[5])
-        #         c=class_list[d]
-        #         if "bus" in c or "truck" in c or "car" in c:
-        #             list.append([x1,y1,x2,y2])
-        #     bbox_id=tracker.update(list)
-        #     for bbox in bbox_id:
-        #         x3,y3,x4,y4,id=bbox
-        #         cx=int(x3+x4)//2
-        #         cy=int(y3+y4)//2
+            a=results[0].boxes.data
+            px=pd.DataFrame(a).astype("float")
+            # cv2.rectangle(roi, (x, y), (x+w, y+h), (255, 0, 0), 2)
+        #    print(px)
+            list=[]
+            for index,row in px.iterrows():
+                x1=int(row[0])
+                y1=int(row[1])
+                x2=int(row[2])
+                y2=int(row[3])
+                d=int(row[5])
+                c=class_list[d]
+                if "bus" in c or "truck" in c or "car" in c:
+                    list.append([x1,y1,x2,y2])
+            bbox_id=tracker.update(list)
+            for bbox in bbox_id:
+                x3,y3,x4,y4,id=bbox
+                cx=int(x3+x4)//2
+                cy=int(y3+y4)//2
         
-        #         cv2.rectangle(roi,(x3,y3),(x4,y4),(0,255,255),2)
+                cv2.rectangle(roi,(x3,y3),(x4,y4),(0,255,255),2)
             
             
-        #         if cy1<(cy+offset) and cy1 > (cy-offset):
-        #             vh_down[id]=time.time()
-        #         if id in vh_down:
-        #             if cy2<(cy+offset) and cy2 > (cy-offset):
-        #                 counter.append(id)
+                if cy1<(cy+offset) and cy1 > (cy-offset):
+                    vh_down[id]=time.time()
+                if id in vh_down:
+                    if cy2<(cy+offset) and cy2 > (cy-offset):
+                        counter.append(id)
 
-        #     cv2.line(roi,(170,cy1),(1900,cy1),(255,255,255),3)
+            cv2.line(roi,(170,cy1),(1900,cy1),(255,255,255),3)
 
-        #     # cv2.putText(roi,('L1'),(260,180),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),4)
+            # cv2.putText(roi,('L1'),(260,180),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),4)
 
-        #     # cv2.line(roi,(177,cy2),(1927,cy2),(255,255,255),4)
+            # cv2.line(roi,(177,cy2),(1927,cy2),(255,255,255),4)
             
-        #     # cv2.putText(roi,('L2'),(282,367),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),4)
-        #     d=(len(counter))
-        #     u=(len(counter1))
-        #     # cv2.putText(frame,('goingdown:-')+str(d),(60,90),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),4)
+            # cv2.putText(roi,('L2'),(282,367),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),4)
+            d=(len(counter))
+            u=(len(counter1))
+            # cv2.putText(frame,('goingdown:-')+str(d),(60,90),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),4)
 
-        #     # cv2.putText(frame,('goingup:-')+str(u),(60,130),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),2)
-        #     # area de reportes:
+            # cv2.putText(frame,('goingup:-')+str(u),(60,130),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,255,255),2)
+            # area de reportes:
             
-        #     # cv2.putText(frame,('vehiculos: -> ')+str(carros_cont),(80,109),cv2.FONT_HERSHEY_COMPLEX,1.4,(255,0,0),3)
-        #     cvzone.putTextRect(frame,f'Total Vehicles ={str(carros_cont)}',[290,34],thickness=4,scale=2.3,border=2)
-        #     # cv2.putText(frame,('personas en area : -> ')+str(personas_cont),(60,790),cv2.FONT_HERSHEY_COMPLEX,1.5,(0,0,255),3)
-        #     # # end
-        #     # ingresa el area procesada al frame principal
-        #     frame[y:y+h, x:x+w]=roi
-        #     cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
+            # cv2.putText(frame,('vehiculos: -> ')+str(carros_cont),(80,109),cv2.FONT_HERSHEY_COMPLEX,1.4,(255,0,0),3)
+            cvzone.putTextRect(frame,f'Total Vehicles ={str(carros_cont)}',[290,34],thickness=4,scale=2.3,border=2)
+            # cv2.putText(frame,('personas en area : -> ')+str(personas_cont),(60,790),cv2.FONT_HERSHEY_COMPLEX,1.5,(0,0,255),3)
+            # # end
+            # ingresa el area procesada al frame principal
+            frame[y:y+h, x:x+w]=roi
+            cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
 
             # plate_foto, total_time = alpr.mostrar_predicts(frame)
             plate_foto, total_time = alpr.mostrar_predicts(roi)
+            detecciones=[]
+            detections = np.empty((0,5))
+            result2=poligonDeInteres(frame)
+            
+            result = model(result2,stream=1)
+            for info in result:
+                boxes = info.boxes
+                for box in boxes:
+                    x1,y1,x2,y2 = box.xyxy[0]
+                    conf = box.conf[0]
+                    cls = int(box.cls)
+                    detecciones.append(cls)
+                    # VehiclesInArea(detecciones)
+                    # print(cls,'angel seguridad')
+                    classindex = box.cls[0]
+                    conf = math.ceil(conf * 100)
+                    classindex = int(classindex)
+                    objectdetect = classnames[classindex]
+                    if objectdetect == 'car' or objectdetect == 'bus' or objectdetect =='truck' or objectdetect =='motorcycle' and conf >60:
+                        x1,y1,x2,y2 = int(x1),int(y1),int(x2),int(y2)
+                        new_detections = np.array([x1,y1,x2,y2,conf])
+                        track_result = tracker.update(detections)
+                        detections = np.vstack((detections,new_detections))
+                        
+                        
+                        
+                        cv2.line(frame,(line[0],line[1]),(line[2],line[3]),(0,255,255),7)
+                    
+                        for results in track_result:
+                            x1,y1,x2,y2,id = results
+                            x1, y1, x2, y2, id = int(x1), int(y1), int(x2), int(y2),int(id)
+
+                            w,h = x2-x1,y2-y1
+                            cx,cy = x1+w//2 , y1+h//2
+
+                            cv2.circle(frame,(cx,cy),6,(0,0,255),-1)
+                            cv2.rectangle(frame,(x1,y1),(x2,y2),(0,0,255),3)
+                            cvzone.putTextRect(frame,f'{id}',
+                                            [x1+8,y1-12],thickness=2,scale=1.5)
+
+                            if line[0] < cx <line[2] and line[1] -20 <cy <line[1]+20:
+                                cv2.line(frame, (line[0], line[1]), (line[2], line[3]), (0, 0, 255), 15)
+                                if counter.count(id) == 0:
+                                    counter.append(id)
+                cvzone.putTextRect(frame,f'Total Vehicles ={len(counter)}',[290,34],thickness=4,scale=2.3,border=2)
+
 
              # Verificar si la placa ya está en el diccionario
             if alpr.plate in placas:

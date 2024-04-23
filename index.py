@@ -7,7 +7,7 @@ from db.models import *
 import pandas as pd
 from sort import *
 import math
-from data import *
+from poligono import *
 import time
 import cvzone
 from fastapi import FastAPI, Response, UploadFile, File
@@ -73,7 +73,7 @@ def get_total_plates():
 def get_last_plate_numbers():
     db = SessionLocal()
     try:
-        # plate_numbers = db.query(PlateCamera.plate_number).order_by(desc(PlateCamera.created_at)).limit(5).all()
+       
         plate_numbers = db.query(PlateCamera.placa).order_by(desc(PlateCamera.id)).limit(5).all()
         
         print (plate_numbers)
@@ -86,7 +86,6 @@ def get_last_plate_numbers():
         
 
 arrayReconocidos = []
-
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
@@ -158,35 +157,7 @@ def return_images():
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
-def poligonDeInteres(frame):
-    img =frame.copy()
 
-    px1,py1,px2,py2,px3,py3,px4,py4 = conf_camara[0]['camara3']['poligono'].values()
-    print(px1)
-
-     # Definir los puntos iniciales del polígono (aquí puedes ajustar según tu necesidad)
-    poligonos = np.array([[px1, py1], [px2, py2], [px3, py3 ],[px4, py4]], np.int32)
-   #   # Dibujar el polígono en la imagen
-    
-   #  # Crear una máscara negra del mismo tamaño que la imagen original
-    mask = np.zeros_like(img)
-    
-   #  # Dibujar el polígono en la máscara
-    cv2.fillPoly(mask, [poligonos], (255, 255, 255))
-    
-   #  # Usar la máscara para dejar en negro el exterior del polígono en la imagen original
-    img[mask == 0] = 0
-    
-   #  # Dibujar el polígono en la imagen
-    cv2.polylines(frame, [poligonos], isClosed=True, color=(0, 255, 0), thickness=2)
-    # cv2.imshow('mascara', img)
-    if cv2.waitKey(1) & 0xFF == 27:
-        pass
-    # cv2.release()
-    # Mostrar la imagen con el polígono dibujado en pantalla
-    
-    # print('llego')
-    return img
 
 async def save_plate(plate_foto: np.ndarray, alpr: ALPR, count: int):
     out_boxes, __, _, num_boxes = alpr.bboxes
@@ -198,12 +169,7 @@ async def save_plate(plate_foto: np.ndarray, alpr: ALPR, count: int):
         x2 = int(coor[3] * image_w)
         y2 = int(coor[2] * image_h)
         new_frame = plate_foto.copy()[y1:y2, x1:x2]
-        # print('Que Diablos eres:',plate_foto)
-        # cv2.imshow('placa',new_frame)
-        # result2=poligonDeInteres(frame)
-        # cv2.rectangle(result2, (x1, y1), (x2, y2), (255, 0, 0), 2)
-        # new_frame, total_time = alpr.mostrar_predicts(result2)
-        # Guardar los datos en la base de datos
+       
         plate_number = alpr.plate
         
         if len(plate_number) >= 6:  # Validación de longitud mínima de placa
@@ -226,9 +192,6 @@ async def resize_frame_to_bytes(frame: cv2.Mat):
     return buffer.tobytes()
 
 
-# def VehiclesInArea(array):
-    # cvzone.putTextRect(frame,f'Vehiculos en Area ={len(array)}',[290,74],thickness=4,scale=2.3,border=2)
-    # print(array)
 
 async def gen_frames(cfg):
     alpr = ALPR(cfg['modelo'], cfg['db'])
@@ -240,7 +203,6 @@ async def gen_frames(cfg):
 
     while True:
         try:
-            # stream = VideoCapture(video_path)
             await asyncio.sleep(0.30)
             frame = CamGear.read()
             count += 1
@@ -248,7 +210,6 @@ async def gen_frames(cfg):
                 continue
             detecciones=[]
             detections = np.empty((0,5))
-            # plate_foto, total_time = alpr.mostrar_predicts(frame)
             result2=poligonDeInteres(frame)
             
             result = model(result2,stream=1)
@@ -259,8 +220,6 @@ async def gen_frames(cfg):
                     conf = box.conf[0]
                     cls = int(box.cls)
                     detecciones.append(cls)
-                    # VehiclesInArea(detecciones)
-                    # print(cls,'angel seguridad')
                     classindex = box.cls[0]
                     conf = math.ceil(conf * 100)
                     classindex = int(classindex)
@@ -269,14 +228,10 @@ async def gen_frames(cfg):
                         x1,y1,x2,y2 = int(x1),int(y1),int(x2),int(y2)
                         new_detections = np.array([x1,y1,x2,y2,conf])
                         detections = np.vstack((detections,new_detections))
-                        #vamos hacer la prueba
-                        # print(f'frame {type(frame)} y frame poligono {type(result2)}')
+                       
                       
                     plate_foto, total_time = alpr.mostrar_predicts(frame)
-                    # print('Cafe:',list(rectangulo_placas))
-                    cv2.imshow('plate', plate_foto)
-                    # if cv2.waitKey(1) & 0xFF == 27:
-                    #         pass
+                   
                     track_result = tracker.update(detections)
                     cv2.line(frame,(line[0],line[1]),(line[2],line[3]),(0,255,255),7)
                     # Verificar si la placa ya está en el diccionario
@@ -284,9 +239,7 @@ async def gen_frames(cfg):
                         # Si la placa ya está en el diccionario, no necesitamos hacer nada más
                         pass
                     else:
-                        # Si la placa es nueva, la agregamos al diccionario con su ID correspondiente
-                        
-                        #placas[alpr.plate] = count
+
                         if len(placas) == 100:
                             placas.pop(0)
                             placas.append(alpr.plate)  
@@ -307,7 +260,7 @@ async def gen_frames(cfg):
                         cv2.line(frame, (line[0], line[1]), (line[2], line[3]), (0, 0, 255), 15)
                         if counter.count(id) == 0:
                             counter.append(id)
-            cvzone.putTextRect(frame,f'Total Vehicles ={len(counter)}',[290,34],thickness=4,scale=2.3,border=2)
+                cvzone.putTextRect(frame,f'Total Vehicles ={len(counter)}',[290,34],thickness=4,scale=2.3,border=2)
             
             # Función para guardar las placas en la base de datos
             asyncio.ensure_future(save_plate(plate_foto, alpr, count))
