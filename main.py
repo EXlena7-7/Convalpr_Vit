@@ -479,51 +479,7 @@ async def gen_frames(cfg):
 
             # plate_foto, total_time = alpr.mostrar_predicts(frame)
             plate_foto, total_time = alpr.mostrar_predicts(roi)
-            detecciones=[]
-            detections = np.empty((0,5))
-            result2=poligonDeInteres(frame)
             
-            result = model(result2,stream=1)
-            for info in result:
-                boxes = info.boxes
-                for box in boxes:
-                    x1,y1,x2,y2 = box.xyxy[0]
-                    conf = box.conf[0]
-                    cls = int(box.cls)
-                    detecciones.append(cls)
-                    # VehiclesInArea(detecciones)
-                    # print(cls,'angel seguridad')
-                    classindex = box.cls[0]
-                    conf = math.ceil(conf * 100)
-                    classindex = int(classindex)
-                    objectdetect = classnames[classindex]
-                    if objectdetect == 'car' or objectdetect == 'bus' or objectdetect =='truck' or objectdetect =='motorcycle' and conf >60:
-                        x1,y1,x2,y2 = int(x1),int(y1),int(x2),int(y2)
-                        new_detections = np.array([x1,y1,x2,y2,conf])
-                        track_result = tracker.update(detections)
-                        detections = np.vstack((detections,new_detections))
-                        
-                        
-                        
-                        cv2.line(frame,(line[0],line[1]),(line[2],line[3]),(0,255,255),7)
-                    
-                        for results in track_result:
-                            x1,y1,x2,y2,id = results
-                            x1, y1, x2, y2, id = int(x1), int(y1), int(x2), int(y2),int(id)
-
-                            w,h = x2-x1,y2-y1
-                            cx,cy = x1+w//2 , y1+h//2
-
-                            cv2.circle(frame,(cx,cy),6,(0,0,255),-1)
-                            cv2.rectangle(frame,(x1,y1),(x2,y2),(0,0,255),3)
-                            cvzone.putTextRect(frame,f'{id}',
-                                            [x1+8,y1-12],thickness=2,scale=1.5)
-
-                            if line[0] < cx <line[2] and line[1] -20 <cy <line[1]+20:
-                                cv2.line(frame, (line[0], line[1]), (line[2], line[3]), (0, 0, 255), 15)
-                                if counter.count(id) == 0:
-                                    counter.append(id)
-                cvzone.putTextRect(frame,f'Total Vehicles ={len(counter)}',[290,34],thickness=4,scale=2.3,border=2)
 
 
              # Verificar si la placa ya está en el diccionario

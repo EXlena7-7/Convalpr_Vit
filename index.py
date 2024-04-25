@@ -23,7 +23,7 @@ os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 import time
 from alpr.alpr import ALPR
 from argparse import ArgumentParser
-
+import yaml
 from services.video_capture import VideoCapture
 import logging
 from timeit import default_timer as timer
@@ -39,6 +39,32 @@ import tempfile
 from PIL import Image
 from ultralytics import YOLO
 model = YOLO('yolov8s.pt')
+
+ruta_configuracion= "config.yaml"
+
+def obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion):
+
+    with open(ruta_configuracion, 'r') as f:
+        config = yaml.safe_load(f)
+        fuente = config.get('video', {}).get('fuente', None)
+        if fuente:
+            # Verificar si la fuente es una URL RTSP
+            if fuente.startswith('rtsp://'):
+                # Extraer la parte de la URL que contiene la IP y el puerto
+                inicio_ip = fuente.find('@') + 1
+                final_ip = fuente.find(':', inicio_ip)
+                ip_camara = fuente[inicio_ip:final_ip]
+                # Extraer el puerto de la URL RTSP
+                inicio_puerto = final_ip + 1
+                final_puerto = fuente.find('/', inicio_puerto)
+                puerto_camara = fuente[inicio_puerto:final_puerto]
+                # print('Puerto:',puerto_camara)
+                return ip_camara, puerto_camara
+            else:
+                raise ValueError("La fuente no es una URL RTSP válida.")
+        else:
+            raise ValueError("La fuente no está especificada en el archivo de configuración.")
+        
 
 
 classnames  = []
@@ -224,7 +250,7 @@ async def gen_frames(cfg):
                     conf = math.ceil(conf * 100)
                     classindex = int(classindex)
                     objectdetect = classnames[classindex]
-                    if objectdetect == 'car' or objectdetect == 'bus' or objectdetect =='truck' or objectdetect =='motorcycle' and conf >60:
+                    if objectdetect == 'car' or objectdetect == 'bus' or objectdetect =='truck' and conf >60:
                         x1,y1,x2,y2 = int(x1),int(y1),int(x2),int(y2)
                         new_detections = np.array([x1,y1,x2,y2,conf])
                         detections = np.vstack((detections,new_detections))

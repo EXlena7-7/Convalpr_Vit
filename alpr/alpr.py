@@ -80,6 +80,10 @@ class ALPR(SqlSaver):
         end = timer()
         total_time += end - start
         fontScale = 1.25
+        #hols doy msrjory ptobsnfo
+        #print('variable iterada ',list(self.iter_coords) )
+        #a=input('listo')
+        marjory_array=self.iter_coords
         for yolo_prediction in self.iter_coords:
             x1, y1, x2, y2, _ = yolo_prediction
             #

@@ -10,7 +10,7 @@ video:
     # Camara IP
     #fuente: 'rtsp://usuario:pass@IP:Puerto' rtsp://admin:Vt3lc4123@38.51.120.236:8061
     # fuente: 'rtsp://admin:Vt3lc4123@38.51.120.236:8061'
-    # fuente: 'rtsp://admin:Vt3lc4123@38.51.120.236:8061'
+    # fuente: 'rtsp://admin:Vt3lc4123@38.51.120.236:8062'
     #   fuente: 'rtsp://admin:Covv01%2A.@200.109.234.154:554/Streaming/Channels/101'
     fuente: 'rtsp://admin:Covv01%2A.@200.109.234.154:554'
 
@@ -58,7 +58,7 @@ db:
     # Guardar en SQLite
     # ( Base de datos Local )
     # (No guarda cuando se usa --demo)
-    guardar: false
+    guardar: true
 
     # Cada cuantas patentes hacer
     # el insert en la BD
