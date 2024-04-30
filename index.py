@@ -218,16 +218,6 @@ async def save_plate(plate_foto: np.ndarray, alpr: ALPR, count: int):
             nueva_entrada = PlateCamera(placa=plate_number, camara=ip_camera, interseccion="AVENIDA RAFAEL GONZALEZ CON JACINTO LARA") 
             
             
-            # ocr_results = {
-            #     "data": [
-            #         {
-            #             "plates": plate_number,
-            #             "camara": ip_camera,
-            #             "vehiculos": "2",
-            #             "moment": hora_deteccion.strftime("%Y-%m-%d %H:%M:%S")
-            #         }
-            #             ]
-            # }
             print(' Se puede :', plate_number)
             ocr_results = {
                 "data": 
