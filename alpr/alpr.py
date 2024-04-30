@@ -54,7 +54,7 @@ class ALPR(SqlSaver):
             self.update_in_memory(patentes)
         return patentes
 
-    def mostrar_predicts(self, frame: np.ndarray):
+    def mostrar_predicts(self, frame: np.ndarray ,result2):
         """
         Mostrar localizador + reconocedor
 
@@ -70,7 +70,7 @@ class ALPR(SqlSaver):
         total_time = 0
         start = timer()
         # Preprocess
-        input_img = self.detector.preprocess(frame)
+        input_img = self.detector.preprocess(result2)
         # Inference
         yolo_out = self.detector.predict(input_img)
         # Bounding Boxes despues de NMS

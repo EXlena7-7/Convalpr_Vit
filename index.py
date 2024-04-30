@@ -256,7 +256,7 @@ async def gen_frames(cfg):
                         detections = np.vstack((detections,new_detections))
                        
                       
-                    plate_foto, total_time = alpr.mostrar_predicts(frame)
+                    plate_foto, total_time = alpr.mostrar_predicts(frame,result2)
                    
                     track_result = tracker.update(detections)
                     cv2.line(frame,(line[0],line[1]),(line[2],line[3]),(0,255,255),7)
