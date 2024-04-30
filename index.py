@@ -1,5 +1,9 @@
 import cv2
 import os
+import json
+from typing import List
+from pydantic import BaseModel
+from datetime import datetime
 from camaras import *
 from camaras.init import *
 from db.coneccion import *
@@ -185,6 +189,16 @@ def read_root():
     return {"Hello": "World"}
 
 
+class OCRResult(BaseModel):
+    plates: str
+    camara: str
+    vehiculos: str
+    moment: datetime
+
+class OCRResults(BaseModel):
+    data: List[OCRResult]
+
+
 async def save_plate(plate_foto: np.ndarray, alpr: ALPR, count: int):
     out_boxes, __, _, num_boxes = alpr.bboxes
     image_h, image_w, _ = plate_foto.shape
@@ -194,13 +208,35 @@ async def save_plate(plate_foto: np.ndarray, alpr: ALPR, count: int):
         y1 = int(coor[0] * image_h)
         x2 = int(coor[3] * image_w)
         y2 = int(coor[2] * image_h)
+        hora_deteccion = datetime.now()
         new_frame = plate_foto.copy()[y1:y2, x1:x2]
-       
+        global ocr_results
         plate_number = alpr.plate
         
         if len(plate_number) >= 6:  # Validación de longitud mínima de placa
             ip_camera = obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion)[0]
             nueva_entrada = PlateCamera(placa=plate_number, camara=ip_camera, interseccion="AVENIDA RAFAEL GONZALEZ CON JACINTO LARA") 
+            
+            
+            # ocr_results = {
+            #     "data": [
+            #         {
+            #             "plates": plate_number,
+            #             "camara": ip_camera,
+            #             "vehiculos": "2",
+            #             "moment": hora_deteccion.strftime("%Y-%m-%d %H:%M:%S")
+            #         }
+            #             ]
+            # }
+            print(' Se puede :', plate_number)
+            ocr_results = {
+                "data": 
+                    [{"plates": plate_number,
+                    "camara": ip_camera,
+                    "vehiculos":"2",
+                    "moment": hora_deteccion.strftime("%Y-%m-%d %H:%M:%S") 
+                    }] 
+            }
             session.add(nueva_entrada)
             session.commit()
 
@@ -246,7 +282,7 @@ async def gen_frames(cfg):
                     conf = box.conf[0]
                     cls = int(box.cls)
                     detecciones.append(cls)
-                    print(detecciones,' esta es el beta   ')
+                    # print(detecciones,' esta es el beta   ')
                     classindex = box.cls[0]
                     conf = math.ceil(conf * 100)
                     classindex = int(classindex)
@@ -263,6 +299,7 @@ async def gen_frames(cfg):
                     cv2.line(frame,(line[0],line[1]),(line[2],line[3]),(0,255,255),7)
                     # Verificar si la placa ya está en el diccionario
                     if alpr.plate in placas:
+                        
                         # Si la placa ya está en el diccionario, no necesitamos hacer nada más
                         pass
                     else:
@@ -270,7 +307,7 @@ async def gen_frames(cfg):
                         if len(placas) == 100:
                             placas.pop(0)
                             placas.append(alpr.plate)  
-    
+                           
                 for results in track_result:
                     x1,y1,x2,y2,id = results
                     x1, y1, x2, y2, id = int(x1), int(y1), int(x2), int(y2),int(id)
@@ -292,7 +329,7 @@ async def gen_frames(cfg):
             
             # Función para guardar las placas en la base de datos
             asyncio.ensure_future(save_plate(plate_foto, alpr, count))
-                
+            
             # ruta_configuracion = "config.yaml"  # Ruta de tu archivo config.yaml
             ip_camara = obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion)
             print("CAMARA IP, puerto :", ip_camara)
@@ -342,3 +379,14 @@ async def video_feed():
     except Exception as e:
         error_message = {"Cámara no encontrada": str(e)}
     return error_message
+
+
+@app.get("/ocr_results")
+async def get_ocr_results():
+    # Convertir el diccionario a una cadena JSON
+    json_data = json.dumps(ocr_results)
+    datos = json.loads(json_data)
+    print('Datos Json ',datos)
+    # Devolver el objeto JSON como respuesta
+    return {"message": "Datos recibidos", "data": datos}
+
