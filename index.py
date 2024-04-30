@@ -246,6 +246,7 @@ async def gen_frames(cfg):
                     conf = box.conf[0]
                     cls = int(box.cls)
                     detecciones.append(cls)
+                    print(detecciones,' esta es el beta   ')
                     classindex = box.cls[0]
                     conf = math.ceil(conf * 100)
                     classindex = int(classindex)
@@ -287,6 +288,7 @@ async def gen_frames(cfg):
                         if counter.count(id) == 0:
                             counter.append(id)
                 cvzone.putTextRect(frame,f'Total Vehicles ={len(counter)}',[290,34],thickness=4,scale=2.3,border=2)
+                cvzone.putTextRect(frame,f'Vehiculos en area ={len(detecciones)}',[290,64],thickness=4,scale=2.3,border=2)
             
             # Función para guardar las placas en la base de datos
             asyncio.ensure_future(save_plate(plate_foto, alpr, count))
