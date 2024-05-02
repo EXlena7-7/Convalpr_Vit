@@ -1,6 +1,8 @@
 import cv2
 import os
 import json
+# os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
+import openvino as ov
 from typing import List
 from pydantic import BaseModel
 from datetime import datetime
@@ -42,7 +44,13 @@ from fastapi import FastAPI, HTTPException, Query
 import tempfile
 from PIL import Image
 from ultralytics import YOLO
+
 model = YOLO('yolov8s.pt')
+# ov_model = ov.convert_model(model)
+
+# # compile the model for CPU device
+# core = ov.Core()
+# compiled_model = core.compile_model(ov_model, 'CPU')
 
 ruta_configuracion= "config.yaml"
 
@@ -62,7 +70,7 @@ def obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion):
                 inicio_puerto = final_ip + 1
                 final_puerto = fuente.find('/', inicio_puerto)
                 puerto_camara = fuente[inicio_puerto:final_puerto]
-                # print('Puerto:',puerto_camara)
+                print('AQUI Puerto:',puerto_camara)
                 return ip_camara, puerto_camara
             else:
                 raise ValueError("La fuente no es una URL RTSP válida.")
@@ -217,8 +225,6 @@ async def save_plate(plate_foto: np.ndarray, alpr: ALPR, count: int):
             ip_camera = obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion)[0]
             nueva_entrada = PlateCamera(placa=plate_number, camara=ip_camera, interseccion="AVENIDA RAFAEL GONZALEZ CON JACINTO LARA") 
             
-            
-            print(' Se puede :', plate_number)
             ocr_results = {
                 "data": 
                     [{"plates": plate_number,
@@ -380,3 +386,12 @@ async def get_ocr_results():
     # Devolver el objeto JSON como respuesta
     return {"message": "Datos recibidos", "data": datos}
 
+
+@app.post("/datos")
+async def get_ocr_results():
+    # Convertir el diccionario a una cadena JSON
+    json_data = json.dumps(ocr_results)
+    datos = json.loads(json_data)
+    print('Datos Json ',datos)
+    # Devolver el objeto JSON como respuesta
+    return {"message": "Datos recibidos", "data": datos}
