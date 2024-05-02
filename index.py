@@ -1,7 +1,7 @@
 import cv2
 import os
 import json
-# os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
+os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 import openvino as ov
 from typing import List
 from pydantic import BaseModel
@@ -150,6 +150,8 @@ def seend_vehiculesInArea():
         'vehiculos':len(extra_data),
     }
 prueba_vehiculos=[]
+
+
 @app.get("/plate_cameras/")
 def read_plate_cameras(pag: int = 0, limit: int = 10):
     cameras = get_plate_cameras(pag,limit)
@@ -226,18 +228,18 @@ async def save_plate(plate_foto: np.ndarray, alpr: ALPR, count: int):
         y2 = int(coor[2] * image_h)
         hora_deteccion = datetime.now()
         new_frame = plate_foto.copy()[y1:y2, x1:x2]
-        global ocr_results
+        global respuesta_api
         plate_number = alpr.plate
         
         if len(plate_number) >= 6:  # Validación de longitud mínima de placa
             ip_camera = obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion)[0]
             nueva_entrada = PlateCamera(placa=plate_number, camara=ip_camera, interseccion="AVENIDA RAFAEL GONZALEZ CON JACINTO LARA") 
             
-            ocr_results = {
+            respuesta_api = {
                 "data": 
                     [{"plates": plate_number,
                     "camara": ip_camera,
-                    "vehiculos":"2",
+                    'vehiculos':len(extra_data),
                     "moment": hora_deteccion.strftime("%Y-%m-%d %H:%M:%S") 
                     }] 
             }
@@ -330,7 +332,7 @@ async def gen_frames(cfg):
                         if counter.count(id) == 0:
                             counter.append(id)
                 cvzone.putTextRect(frame,f'Total Vehicles ={len(counter)}',[290,34],thickness=4,scale=2.3,border=2)
-                cvzone.putTextRect(frame,f'Vehiculos en area ={len(detecciones)}',[290,104],thickness=4,scale=2.3,border=2)
+                cvzone.putTextRect(frame,f'Vehiculos en area ={len(detecciones)}',[290,114],thickness=4,scale=2.3,border=2)
                 extra_data=detecciones
                 
             # Función para guardar las placas en la base de datos
@@ -392,7 +394,7 @@ async def video_feed():
 @app.get("/ocr_results")
 async def get_ocr_results():
     # Convertir el diccionario a una cadena JSON
-    json_data = json.dumps(ocr_results)
+    json_data = json.dumps(respuesta_api)
     datos = json.loads(json_data)
     print('Datos Json ',datos)
     # Devolver el objeto JSON como respuesta
@@ -402,7 +404,7 @@ async def get_ocr_results():
 @app.post("/datos")
 async def get_ocr_results():
     # Convertir el diccionario a una cadena JSON
-    json_data = json.dumps(ocr_results)
+    json_data = json.dumps(respuesta_api)
     datos = json.loads(json_data)
     print('Datos Json ',datos)
     # Devolver el objeto JSON como respuesta
