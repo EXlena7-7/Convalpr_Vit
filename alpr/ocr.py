@@ -56,6 +56,7 @@ class PlateOCR:
             if avg > self.confianza_avg and self.none_low(probs, thresh=self.none_low_thresh):
                 plate = (''.join(plate)).replace('_', '')
                 patentes.append(plate)
+                print("Se Puede: ",plate)
         return patentes
 
     def none_low(self, probs, thresh=.5):
