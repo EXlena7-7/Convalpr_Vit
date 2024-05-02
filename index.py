@@ -139,8 +139,6 @@ app.mount("/static", StaticFiles(directory="./plates"), name="static")
 def seend_vehiculesInArea():
     # extra_data
     return {
-        
-        'total': ['holas','soy','angel'],
         'vehiculos':len(extra_data),
     }
 prueba_vehiculos=[]
@@ -293,11 +291,7 @@ async def gen_frames(cfg):
                     conf = box.conf[0]
                     cls = int(box.cls)
                     detecciones.append(cls)
-<<<<<<< HEAD
                   
-=======
-                    # print(detecciones,' esta es el beta   ')
->>>>>>> 0eac3b46f4a00611c23589d75562dc1acacd8a94
                     classindex = box.cls[0]
                     conf = math.ceil(conf * 100)
                     classindex = int(classindex)
