@@ -143,7 +143,13 @@ app.add_middleware(
 
 app.mount("/static", StaticFiles(directory="./plates"), name="static")
 
-
+@app.get("/vehiculesInArea/")
+def seend_vehiculesInArea():
+    # extra_data
+    return {
+        'vehiculos':len(extra_data),
+    }
+prueba_vehiculos=[]
 @app.get("/plate_cameras/")
 def read_plate_cameras(pag: int = 0, limit: int = 10):
     cameras = get_plate_cameras(pag,limit)
@@ -159,6 +165,8 @@ def read_plate_cameras(pag: int = 0, limit: int = 10):
 def read_last_plate_numbers():
     plate_numbers = get_last_plate_numbers()
     return plate_numbers
+
+
 
 
 @app.get("/placas")
@@ -252,6 +260,7 @@ async def resize_frame_to_bytes(frame: cv2.Mat):
 
 
 async def gen_frames(cfg):
+    global extra_data
     alpr = ALPR(cfg['modelo'], cfg['db'])
     video_path = cfg['video']['fuente']
     CamGear  = VideoCapture(video_path)
@@ -278,7 +287,7 @@ async def gen_frames(cfg):
                     conf = box.conf[0]
                     cls = int(box.cls)
                     detecciones.append(cls)
-                    # print(detecciones,' esta es el beta   ')
+                  
                     classindex = box.cls[0]
                     conf = math.ceil(conf * 100)
                     classindex = int(classindex)
@@ -321,15 +330,16 @@ async def gen_frames(cfg):
                         if counter.count(id) == 0:
                             counter.append(id)
                 cvzone.putTextRect(frame,f'Total Vehicles ={len(counter)}',[290,34],thickness=4,scale=2.3,border=2)
-                cvzone.putTextRect(frame,f'Vehiculos en area ={len(detecciones)}',[290,64],thickness=4,scale=2.3,border=2)
-            
+                cvzone.putTextRect(frame,f'Vehiculos en area ={len(detecciones)}',[290,104],thickness=4,scale=2.3,border=2)
+                extra_data=detecciones
+                
             # Función para guardar las placas en la base de datos
             asyncio.ensure_future(save_plate(plate_foto, alpr, count))
             
             # ruta_configuracion = "config.yaml"  # Ruta de tu archivo config.yaml
             ip_camara = obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion)
             print("CAMARA IP, puerto :", ip_camara)
-
+          
             yield (b'--frame\r\n'b'Content-Type: image/jpeg\r\n\r\n' + (await resize_frame_to_bytes(frame)) + b'\r\n')
 
         except asyncio.CancelledError:
@@ -367,9 +377,11 @@ if __name__ == '__main__':
 
 @app.get("/video_feed/")
 async def video_feed():
+
     try:
         with open(r'config.yaml', 'r') as stream:
             cfg = yaml.safe_load(stream)
+        
         return StreamingResponse(gen_frames(cfg), media_type="multipart/x-mixed-replace;boundary=frame")
 
     except Exception as e:
