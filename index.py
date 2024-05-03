@@ -55,7 +55,6 @@ model = YOLO('yolov8s.pt')
 ruta_configuracion= "config.yaml"
 
 def obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion):
-
     with open(ruta_configuracion, 'r') as f:
         config = yaml.safe_load(f)
         fuente = config.get('video', {}).get('fuente', None)
@@ -68,14 +67,18 @@ def obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion):
                 ip_camara = fuente[inicio_ip:final_ip]
                 # Extraer el puerto de la URL RTSP
                 inicio_puerto = final_ip + 1
-                final_puerto = fuente.find('/', inicio_puerto)
+                final_puerto = fuente.find('/', inicio_puerto) if '/' in fuente[inicio_puerto:] else len(fuente)
                 puerto_camara = fuente[inicio_puerto:final_puerto]
-                print('AQUI Puerto:',puerto_camara)
+                
                 return ip_camara, puerto_camara
             else:
                 raise ValueError("La fuente no es una URL RTSP válida.")
         else:
             raise ValueError("La fuente no está especificada en el archivo de configuración.")
+
+
+ip, puerto = obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion)
+print(f"IP: {ip}, Puerto: {puerto}")
         
 
 
@@ -228,6 +231,9 @@ async def save_plate(plate_foto: np.ndarray, alpr: ALPR, count: int):
         y2 = int(coor[2] * image_h)
         hora_deteccion = datetime.now()
         new_frame = plate_foto.copy()[y1:y2, x1:x2]
+        # image = cv2.imencode('.jpg', new_frame)[1].tobytes()
+        # cv2.imshow("frame", new_frame)
+        
         global respuesta_api
         plate_number = alpr.plate
         
@@ -235,10 +241,14 @@ async def save_plate(plate_foto: np.ndarray, alpr: ALPR, count: int):
             ip_camera = obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion)[0]
             nueva_entrada = PlateCamera(placa=plate_number, camara=ip_camera, interseccion="AVENIDA RAFAEL GONZALEZ CON JACINTO LARA") 
             
+            ip, puerto = obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion)
+            print(f"IP: {ip}, Puerto: {puerto}")
+            camara_info = f"{ip}:{puerto}"
+        
             respuesta_api = {
                 "data": 
                     [{"plates": plate_number,
-                    "camara": ip_camera,
+                    "camara":camara_info,
                     'vehiculos':len(extra_data),
                     "moment": hora_deteccion.strftime("%Y-%m-%d %H:%M:%S") 
                     }] 
@@ -251,8 +261,8 @@ async def resize_frame_to_bytes(frame: cv2.Mat):
     height, width, _ = frame.shape
 
     # Define las nuevas dimensiones aquí. Por ejemplo, para reducir a la mitad:
-    new_width = width // 4
-    new_height = height // 4
+    new_width = width // 2
+    new_height = height // 2
 
     resized_frame = cv2.resize(frame, (new_width, new_height), interpolation = cv2.INTER_AREA)
 
@@ -339,8 +349,7 @@ async def gen_frames(cfg):
             asyncio.ensure_future(save_plate(plate_foto, alpr, count))
             
             # ruta_configuracion = "config.yaml"  # Ruta de tu archivo config.yaml
-            ip_camara = obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion)
-            print("CAMARA IP, puerto :", ip_camara)
+           
           
             yield (b'--frame\r\n'b'Content-Type: image/jpeg\r\n\r\n' + (await resize_frame_to_bytes(frame)) + b'\r\n')
 
