@@ -147,8 +147,6 @@ conf_camara=[{
    'conte_vehiculos':0,
    'conte_personas':0,
    },
-
-
    # 
     # conf camara punto fijo 62
        'camara4':{
@@ -162,28 +160,22 @@ conf_camara=[{
           'py3':200,
           'px4':1800,
           'py4':1100,
-          
-
      },
-
-    'lineas':[
-      {
-         'linea':[500,500,1800,500],
-         
-      },      {
-         
-         'linea':[500,850,1800,850]
-            
-         
-      }
-      # camara3
-   ],'id_deteccion':[90,334],
+      # lineas de disparos
+    'lineas':[   { 'linea':[500,500,1800,500],},  {'linea':[500,850,1800,850] }
+   ],
+   #esto es para mostrar en la pantalla los estatus 
+   'id_deteccion':[90,334],
     'array_rojo':[90,360],
     'array_azul':[90,390],
     'array_verde':[90,430],
     'placa':[90,460,],
+   #  conte vehiculos y personas
    'conte_vehiculos':0,
    'conte_personas':0,
    },
+
+
+
 },
 ]

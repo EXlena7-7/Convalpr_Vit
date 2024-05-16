@@ -42,6 +42,8 @@ from fastapi import FastAPI, HTTPException, Query
 import tempfile
 from PIL import Image
 from ultralytics import YOLO
+from db.coneccion import second_session
+import ast
 model = YOLO('yolov8s.pt')
 
 ruta_configuracion= "config.yaml"
@@ -78,7 +80,21 @@ with open('coco.txt','r') as f:
 # funtions:
 tracker = Sort(max_age=20)
 line = [50, 550, 3900, 550]
+
 counter = []
+
+def get_conf_camara(pag: int = 0, limit: int = 10):
+    # Example: Interact with the second database
+    session = second_session
+    # Crear una sesión
+    db = session
+    try:
+        offset = pag * limit
+        # Realizar la consulta y devolver los resultados
+        return db.query(Conf_camara).offset(offset).limit(limit).all()
+    finally:
+        # Cerrar la sesión
+        db.close()
 
 
 
@@ -271,7 +287,8 @@ async def gen_frames(cfg):
     placas = []  # Diccionario para almacenar placas y sus IDs
     counter = []
     count=0
-
+    print(configuracion_camara,'estto es la conf')
+    a=input('ready')
     while True:
         try:
             await asyncio.sleep(0.30)
@@ -281,7 +298,7 @@ async def gen_frames(cfg):
                 continue
             detecciones=[]
             detections = np.empty((0,5))
-            result2=poligonDeInteres(frame)
+            result2=poligonDeInteres(frame,configuracion_camara)
             
             result = model(result2,stream=1)
             for info in result:
@@ -381,13 +398,21 @@ if __name__ == '__main__':
 
 @app.get("/video_feed/")
 async def video_feed():
-
+    data=get_conf_camara()
+    for e in data:
+        jsondata=e.conf_camara
+        diccionario = ast.literal_eval(jsondata)
+        global configuracion_camara
+        configuracion_camara=diccionario
+        # print(configuracion_camara,' vamos aca')
+        # print('esto es el diccionario  ', diccionario, '  -  ', type(diccionario))
+    # a=input('esto es')
     try:
         with open(r'config.yaml', 'r') as stream:
             cfg = yaml.safe_load(stream)
         
         return StreamingResponse(gen_frames(cfg), media_type="multipart/x-mixed-replace;boundary=frame")
-
+ 
     except Exception as e:
         error_message = {"Cámara no encontrada": str(e)}
     return error_message
@@ -401,4 +426,5 @@ async def get_ocr_results():
     print('Datos Json ',datos)
     # Devolver el objeto JSON como respuesta
     return {"message": "Datos recibidos", "data": datos}
+
 

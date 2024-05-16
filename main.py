@@ -41,6 +41,8 @@ from sqlalchemy import create_engine, Column, Boolean, Integer, String, Float, D
 from sqlalchemy import desc, asc
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.declarative import declarative_base
+from db.coneccion import SecondSessionLocal
+from db.coneccion import SessionLocal
 from datetime import datetime
 import tempfile
 # import ffmpeg
@@ -52,6 +54,8 @@ from tracker import Tracker
 from sort import *
 import math
 from poligono import *
+# from db.models import Conf_camara
+# /home/vit/Documentos/para marjory/Convalpr_Vit/db/models.py
 classnames  = []
 with open('coco.txt','r') as f:
     classnames = f.read().splitlines()
@@ -94,25 +98,42 @@ class PlateCamera(Base):
     
     
 # Configura la conexión a la base de datos PostgreSQL
-engine = create_engine('postgresql://postgres:password@localhost/api')
+# engine = create_engine('postgresql://postgres:password@localhost/api')
 # engine = create_engine('postgresql://postgres:123456@192.168.7.246/detecion_semaforos')
 
 # SQLALCHEMY_DATABASE_URL = "postgresql://postgres:password@localhost/prueba" 
 # engine = create_engine(SQLALCHEMY_DATABASE_URL)
 
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-Base = declarative_base()
+# Base = declarative_base()
 
 
-# Crea todas las tablas definidas en los modelos en la base de datos
-Base.metadata.create_all(engine)
+# # Crea todas las tablas definidas en los modelos en la base de datos
+# Base.metadata.create_all(engine)
 
-# # Crea una sesión de SQLAlchemy
-Session = sessionmaker(bind=engine)
-session = Session()
+# # # Crea una sesión de SQLAlchemy
+# Session = sessionmaker(bind=engine)
+# session = Session()
 
+
+# def get_conf_camara(pag: int = 0, limit: int = 10):
+#     # Example: Interact with the second database
+#     second_session = SecondSessionLocal()
+# # Use second_session for queries, inserts, updates, etc.
+#     second_session.close()
+#     # Crear una sesión
+#     db = SessionLocal()
+#     print(db)
+#     a=input("dale")
+#     try:
+#         offset = pag * limit
+#         # Realizar la consulta y devolver los resultados
+#         return db.query(Conf_camara).offset(offset).limit(limit).all()
+#     finally:
+#         # Cerrar la sesión
+#         db.close()
 
 def get_plate_cameras(pag: int = 0, limit: int = 10):
     # Crear una sesión

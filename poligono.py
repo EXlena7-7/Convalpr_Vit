@@ -3,10 +3,11 @@ import numpy as np
 from conf_camara import conf_camara 
 
 
-def poligonDeInteres(frame):
+def poligonDeInteres(frame,configuracion_camara):
     img =frame.copy()
 
-    px1,py1,px2,py2,px3,py3,px4,py4 = conf_camara[0]['camara4']['poligono'].values()
+    # px1,py1,px2,py2,px3,py3,px4,py4 = conf_camara[0]['camara4']['poligono'].values()
+    px1,py1,px2,py2,px3,py3,px4,py4 = configuracion_camara['poligono'].values()
     print(px1)
 
      # Definir los puntos iniciales del polígono (aquí puedes ajustar según tu necesidad)
