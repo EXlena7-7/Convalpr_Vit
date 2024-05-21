@@ -47,6 +47,8 @@ import tempfile
 # import ffmpeg
 from PIL import Image
 # import easyocr
+from typing import Dict
+
 from ultralytics import YOLO
 model = YOLO('yolov8s.pt')
 tracker = Tracker()
@@ -69,6 +71,7 @@ vh_up = {}
 
 # Define el modelo base
 Base = declarative_base()
+
 
 # Define la clase del modelo para la tabla de placas y cámaras
 class PlateCamera(Base):
@@ -209,27 +212,27 @@ ruta_configuracion = "config.yaml"
 
 
 
-def obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion):
-    with open(ruta_configuracion, 'r') as f:
-        config = yaml.safe_load(f)
-        fuente = config.get('video', {}).get('fuente', None)
-        if fuente:
-            # Verificar si la fuente es una URL RTSP
-            if fuente.startswith('rtsp://'):
-                # Extraer la parte de la URL que contiene la IP y el puerto
-                inicio_ip = fuente.find('@') + 1
-                final_ip = fuente.find(':', inicio_ip)
-                ip_camara = fuente[inicio_ip:final_ip]
-                # Extraer el puerto de la URL RTSP
-                inicio_puerto = final_ip + 1
-                final_puerto = fuente.find('/', inicio_puerto)
-                puerto_camara = fuente[inicio_puerto:final_puerto]
-                # print('Puerto:',puerto_camara)
-                return ip_camara, puerto_camara
-            else:
-                raise ValueError("La fuente no es una URL RTSP válida.")
-        else:
-            raise ValueError("La fuente no está especificada en el archivo de configuración.")
+# def obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion):
+#     with open(ruta_configuracion, 'r') as f:
+#         config = yaml.safe_load(f)
+#         fuente = config.get('video', {}).get('fuente', None)
+#         if fuente:
+#             # Verificar si la fuente es una URL RTSP
+#             if fuente.startswith('rtsp://'):
+#                 # Extraer la parte de la URL que contiene la IP y el puerto
+#                 inicio_ip = fuente.find('@') + 1
+#                 final_ip = fuente.find(':', inicio_ip)
+#                 ip_camara = fuente[inicio_ip:final_ip]
+#                 # Extraer el puerto de la URL RTSP
+#                 inicio_puerto = final_ip + 1
+#                 final_puerto = fuente.find('/', inicio_puerto)
+#                 puerto_camara = fuente[inicio_puerto:final_puerto]
+#                 # print('Puerto:',puerto_camara)
+#                 return ip_camara, puerto_camara
+#             else:
+#                 raise ValueError("La fuente no es una URL RTSP válida.")
+#         else:
+#             raise ValueError("La fuente no está especificada en el archivo de configuración.")
 
 
 @app.get("/plate_cameras/")
@@ -285,6 +288,51 @@ def read_root():
     return {"Hello": "World"}
 
 
+class ConfiguracionReconocimiento:
+    def __init__(self, video, frecuencia_inferencia, modelo, db):
+        self.video = video
+        self.frecuencia_inferencia = frecuencia_inferencia
+        self.modelo = modelo
+        self.db = db
+
+# Crear un objeto a partir del código
+configuracion = ConfiguracionReconocimiento(
+    video={
+        "fuente": "sadasdasdasd/deteccion.mp4",
+    },
+    frecuencia_inferencia=30,
+    modelo={
+        "resolucion_detector": 608,
+        "confianza_detector": 0.25,
+        "numero_modelo_ocr": 4,
+        "confianza_avg_ocr": 0.3,
+        "confianza_low_ocr": 0.10,
+    },
+    db={
+        "guardar": False,
+        "insert_frequency": 1,
+        "path": "db/plates.db",
+    },
+)
+
+
+
+@app.post("/guardar_en_yaml/")
+async def guardar_en_yaml(datos: Dict[str, str]):
+    # Aquí asumimos que los datos que recibes están en forma de un diccionario
+    ruta_archivo = 'configuracion.yaml'
+    try:
+        # Combinar los datos de la solicitud con la configuración
+        datos_guardar = {**datos, **configuracion.__dict__}
+
+        # Escribir los datos combinados en el archivo YAML
+        with open(ruta_archivo, 'w') as archivo:
+            yaml.dump(datos_guardar, archivo, default_flow_style=False)
+        
+        return {"mensaje": "Datos guardados correctamente en el archivo YAML.", "configuracion": configuracion.__dict__}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # class GeneradorID:
 #     def __init__(self):
 #         self.contador = 0
@@ -307,12 +355,12 @@ async def save_plate(plate_foto: np.ndarray, alpr: ALPR, count: int):
         y2 = int(coor[2] * image_h)
         new_frame = plate_foto.copy()[y1:y2, x1:x2]
         
-        
         # Guardar los datos en la base de datos
         plate_number = alpr.plate
         
         if len(plate_number) >= 6:  # Validación de longitud mínima de placa
-            ip_camera = obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion)[0]
+            # ip_camera = obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion)[0]
+            ip_camera = 192.121
             nueva_entrada = PlateCamera(placa=plate_number, camara=ip_camera, interseccion="AVENIDA RAFAEL GONZALEZ CON JACINTO LARA") 
             session.add(nueva_entrada)
             session.commit()
@@ -561,9 +609,9 @@ async def gen_frames(cfg):
                 # Función para guardar las placas en la base de datos
                 asyncio.ensure_future(save_plate(plate_foto, alpr, count))
                 
-                ruta_configuracion = "config.yaml"  # Ruta de tu archivo config.yaml
-                ip_camara = obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion)
-                print("CAMARA IP, puerto :", ip_camara)
+                # ruta_configuracion = "config.yaml"  # Ruta de tu archivo config.yaml
+                # ip_camara = obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion)
+                # print("CAMARA IP, puerto :", ip_camara)
 
             # count = count + 1
 
@@ -605,7 +653,6 @@ if __name__ == '__main__':
 @app.get("/video_feed/")
 async def video_feed():
     try:
-        
         with open('config.yaml', 'r') as stream:
             cfg = yaml.safe_load(stream)
         return StreamingResponse(gen_frames(cfg), media_type="multipart/x-mixed-replace;boundary=frame")
