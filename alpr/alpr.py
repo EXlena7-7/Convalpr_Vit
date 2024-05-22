@@ -4,29 +4,7 @@ import numpy as np
 from .detector import PlateDetector
 from .ocr import PlateOCR
 from .saver import SqlSaver
-import yaml
 
-ruta_configuracion = "config.yaml"
-
-def obtener_ip_camara_desde_configuracion(ruta_configuracion):
-    with open(ruta_configuracion, 'r') as f:
-        config = yaml.safe_load(f)
-        fuente = config.get('video', {}).get('fuente', None)
-        if fuente:
-            # Verificar si la fuente es una URL RTSP
-            if fuente.startswith('rtsp://'):
-                # Extraer la parte de la URL que contiene la IP
-                inicio_ip = fuente.find('@') + 1
-                final_ip = fuente.find(':', inicio_ip)
-                ip_camara = fuente[inicio_ip:final_ip]
-                ip_camara = obtener_ip_camara_desde_configuracion(ruta_configuracion)
-                print("IP de la cámara:", ip_camara)
-                return ip_camara
-                
-            else:
-                raise ValueError("La fuente no es una URL RTSP válida.")
-        else:
-            raise ValueError("La fuente no está especificada en el archivo de configuración.")
            
 class ALPR(SqlSaver):
     detector: PlateDetector = None
@@ -76,7 +54,7 @@ class ALPR(SqlSaver):
             self.update_in_memory(patentes)
         return patentes
 
-    def mostrar_predicts(self, frame: np.ndarray):
+    def mostrar_predicts(self, frame: np.ndarray ,result2):
         """
         Mostrar localizador + reconocedor
 
@@ -92,7 +70,7 @@ class ALPR(SqlSaver):
         total_time = 0
         start = timer()
         # Preprocess
-        input_img = self.detector.preprocess(frame)
+        input_img = self.detector.preprocess(result2)
         # Inference
         yolo_out = self.detector.predict(input_img)
         # Bounding Boxes despues de NMS
@@ -102,10 +80,16 @@ class ALPR(SqlSaver):
         end = timer()
         total_time += end - start
         fontScale = 1.25
+        #hols doy msrjory ptobsnfo
+        #print('variable iterada ',list(self.iter_coords) )
+        #a=input('listo')
+        marjory_array=self.iter_coords
         for yolo_prediction in self.iter_coords:
             x1, y1, x2, y2, _ = yolo_prediction
             #
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (36, 255, 12), 2)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (36, 255, 12), 1)
+            # cv2.rectangle(frame, (x1, y1), (x2, y2), (255,0,255))
+            # cv2.rectangle(frame, (x1, y1), (x2, y2), (0,0,255), 1)
             #
             start = timer()
             plate, probs = self.ocr.predict_ocr(x1, y1, x2, y2, frame)
@@ -126,5 +110,10 @@ class ALPR(SqlSaver):
                             color=[0, 0, 0], lineType=cv2.LINE_AA, thickness=6)
                 cv2.putText(img=frame, text=mostrar_txt, org=(x1 - 20, y1 - 15),
                             fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=fontScale,
-                            color=[255, 255, 255], lineType=cv2.LINE_AA, thickness=2)
+                            color=[255, 255, 255], lineType=cv2.LINE_AA, thickness=2 )
+        # rectangulo_placas=self.iter_coords
+        # print('VALOR:', rectangulo_placas)
+        # a=input('trtyrryruurew')
         return frame, total_time
+    
+    
