@@ -414,13 +414,14 @@ async def get_ocr_results():
 
 @app.get("/capture")
 def capture_image():
-    cap = cv2.VideoCapture(stream)
     output_directory = './capturas'  # Ruta de salida donde se guardarán las capturas  # Ruta de salida donde se guardarán las capturas
     capture_filename = 'latest_capture.jpg'  # Nombre del archivo de la captura más reciente
     # Verificar si ya existe una captura
     latest_capture_path = os.path.join(output_directory, capture_filename)
     if os.path.exists(latest_capture_path):
         return FileResponse(latest_capture_path, media_type='image/jpeg')
+    
+    cap = cv2.VideoCapture(stream)
     
     # Abrir la cámara IP usando la URL proporcionada
 
