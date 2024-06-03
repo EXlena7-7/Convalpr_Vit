@@ -15,12 +15,12 @@ video:
     #   fuente: 'rtsp://admin:Covv01%2A.@200.109.234.154:554/Streaming/Channels/101'
     # fuente: 'rtsp://admin:Covv01%2A.@200.109.234.154:554'
 
-    # fuente: 'assets/carrosComprimido.mp4'
+    # fuente: 'assets/deteccion.mp4'
 
      # ''
     #Camaras operativas:
 #    fuente: 'rtsp://admin:Vt3lc4123@38.51.120.236:8061'
-    ## 'rtsp://admin:Vt3lc4123@38.51.120.236:8062'
+    # fuente: 'rtsp://admin:Vt3lc4123@38.51.120.236:8062'
     ## 'rtsp://admin:Vt3lc4123@38.51.120.236:8063'
     ## 'rtsp://admin:Vt3lc4123@38.51.120.236:8064'
 

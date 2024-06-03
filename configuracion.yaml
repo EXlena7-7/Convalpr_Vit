@@ -1,0 +1,16 @@
+additionalProp1: string
+additionalProp2: asdasdasd
+additionalProp3: striasdasdasdng
+db:
+  guardar: false
+  insert_frequency: 1
+  path: db/plates.db
+frecuencia_inferencia: 30
+modelo:
+  confianza_avg_ocr: 0.3
+  confianza_detector: 0.25
+  confianza_low_ocr: 0.1
+  numero_modelo_ocr: 4
+  resolucion_detector: 608
+video:
+  fuente: sadasdasdasd/deteccion.mp4
