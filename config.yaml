@@ -6,11 +6,11 @@ video:
     # Camara integrada
     #fuente: '0'
 
-    # fuente: 'rtsp://admin:abc123**@192.168.7.136'
+    fuente: 'rtsp://admin:abc123**@192.168.7.136'
     # Camara IP
     #fuente: 'rtsp://usuario:pass@IP:Puerto' rtsp://admin:Vt3lc4123@38.51.120.236:8061
     # fuente: 'rtsp://admin:Vt3lc4123@38.51.120.236:8061'
-    fuente: 'rtsp://admin:Vt3lc4123@38.51.120.236:8062'
+    # fuente: 'rtsp://admin:abc123**@192.168.7.136'
     # fuente: '/home/vit/Documentos/para marjory/Convalpr_Vit/veh2.mp4'
     #   fuente: 'rtsp://admin:Covv01%2A.@200.109.234.154:554/Streaming/Channels/101'
     # fuente: 'rtsp://admin:Covv01%2A.@200.109.234.154:554'

@@ -111,6 +111,7 @@ class PlateDetector:
 
         # Guardar la captura en la carpeta "plates"
         cv2.imwrite(os.path.join('plates', capture_name), area)
+        cv2.imshow('frame',capture_name)
         return frame
 
     def yield_coords(self, frame: np.ndarray, bboxes: list):

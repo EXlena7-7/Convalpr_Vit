@@ -17,7 +17,7 @@ from poligono import *
 import time
 import cvzone
 from fastapi import FastAPI, Response, UploadFile, File
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from starlette.requests import Request
 import asyncio
 from vidgear.gears import CamGear
@@ -91,7 +91,9 @@ tracker = Sort(max_age=20)
 line = [50, 550, 3900, 550]
 counter = []
 
-
+camera_ip = 'rtsp://admin:Covv01%2A.@200.109.234.154:554/' 
+output_directory = './capturas'  # Ruta de salida donde se guardarán las capturas  # Ruta de salida donde se guardarán las capturas
+capture_filename = 'latest_capture.jpg'  # Nombre del archivo de la captura más reciente
 
 def get_plate_cameras(pag: int = 0, limit: int = 10):
     # Crear una sesión
@@ -418,3 +420,36 @@ async def get_ocr_results():
     print('Datos Json ',datos)
     # Devolver el objeto JSON como respuesta
     return {"message": "Datos recibidos", "data": datos}
+
+
+@app.get("/capture")
+def capture_image():
+    # Verificar si ya existe una captura
+    latest_capture_path = os.path.join(output_directory, capture_filename)
+    if os.path.exists(latest_capture_path):
+        return FileResponse(latest_capture_path, media_type='image/jpeg')
+    
+    # Abrir la cámara IP usando la URL proporcionada
+    cap = cv2.VideoCapture(camera_ip)
+
+    if not cap.isOpened():
+        raise HTTPException(status_code=500, detail="No se pudo abrir la cámara IP")
+
+    # Leer un frame de la cámara
+    ret, frame = cap.read()
+
+    if not ret:
+        raise HTTPException(status_code=500, detail="No se pudo capturar una imagen")
+
+    # Guardar la imagen en disco en formato JPEG con calidad reducida
+    quality = 50  # Ajusta la calidad entre 0 y 100 (menor valor, menor calidad y tamaño)
+    success = cv2.imwrite(latest_capture_path, frame, [cv2.IMWRITE_JPEG_QUALITY, quality])
+    if not success:
+        raise HTTPException(status_code=500, detail="Error al guardar la imagen")
+
+    # Liberar la cámara
+    cap.release()
+
+    return FileResponse(latest_capture_path, media_type='image/jpeg')
+
+
