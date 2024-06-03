@@ -46,11 +46,6 @@ from PIL import Image
 from ultralytics import YOLO
 
 model = YOLO('yolov8s.pt')
-# ov_model = ov.convert_model(model)
-
-# # compile the model for CPU device
-# core = ov.Core()
-# compiled_model = core.compile_model(ov_model, 'CPU')
 
 ruta_configuracion= "config.yaml"
 
@@ -91,9 +86,7 @@ tracker = Sort(max_age=20)
 line = [50, 550, 3900, 550]
 counter = []
 
-camera_ip = 'rtsp://admin:Covv01%2A.@200.109.234.154:554/' 
-output_directory = './capturas'  # Ruta de salida donde se guardarán las capturas  # Ruta de salida donde se guardarán las capturas
-capture_filename = 'latest_capture.jpg'  # Nombre del archivo de la captura más reciente
+
 
 def get_plate_cameras(pag: int = 0, limit: int = 10):
     # Crear una sesión
@@ -301,7 +294,6 @@ async def gen_frames(cfg):
                     conf = box.conf[0]
                     cls = int(box.cls)
                     detecciones.append(cls)
-                  
                     classindex = box.cls[0]
                     conf = math.ceil(conf * 100)
                     classindex = int(classindex)
@@ -349,9 +341,7 @@ async def gen_frames(cfg):
                 
             # Función para guardar las placas en la base de datos
             asyncio.ensure_future(save_plate(plate_foto, alpr, count))
-            
-            # ruta_configuracion = "config.yaml"  # Ruta de tu archivo config.yaml
-           
+        
           
             yield (b'--frame\r\n'b'Content-Type: image/jpeg\r\n\r\n' + (await resize_frame_to_bytes(frame)) + b'\r\n')
 
@@ -424,13 +414,15 @@ async def get_ocr_results():
 
 @app.get("/capture")
 def capture_image():
+    cap = cv2.VideoCapture(stream)
+    output_directory = './capturas'  # Ruta de salida donde se guardarán las capturas  # Ruta de salida donde se guardarán las capturas
+    capture_filename = 'latest_capture.jpg'  # Nombre del archivo de la captura más reciente
     # Verificar si ya existe una captura
     latest_capture_path = os.path.join(output_directory, capture_filename)
     if os.path.exists(latest_capture_path):
         return FileResponse(latest_capture_path, media_type='image/jpeg')
     
     # Abrir la cámara IP usando la URL proporcionada
-    cap = cv2.VideoCapture(camera_ip)
 
     if not cap.isOpened():
         raise HTTPException(status_code=500, detail="No se pudo abrir la cámara IP")
