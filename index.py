@@ -234,7 +234,7 @@ async def save_plate(plate_foto: np.ndarray, alpr: ALPR, count: int):
         
         if len(plate_number) >= 6:  # Validación de longitud mínima de placa
             ip_camera = obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion)[0]
-            nueva_entrada = PlateCamera(placa=plate_number, camara=ip_camera, interseccion="AVENIDA RAFAEL GONZALEZ CON JACINTO LARA") 
+            
             
             ip, puerto = obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion)
             print(f"IP: {ip}, Puerto: {puerto}")
@@ -244,12 +244,28 @@ async def save_plate(plate_foto: np.ndarray, alpr: ALPR, count: int):
                 "data": 
                     [{"plates": plate_number,
                     "camara":camara_info,
-                    'vehiculos':len(extra_data),
+                    "vehiculos":len(extra_data),
                     "moment": hora_deteccion.strftime("%Y-%m-%d %H:%M:%S") 
                     }] 
             }
+            
+            
+            vehiculo = session.query(Vehiculo).filter_by(cantidad=str(len(extra_data))).first()
+            if not vehiculo:
+                vehiculo = Vehiculo(cantidad=str(len(extra_data)))
+                session.add(vehiculo)
+                session.commit()
+                
+            nueva_entrada = PlateCamera(
+            placa=plate_number,
+            camara=camara_info,
+            interseccion="AVENIDA RAFAEL GONZALEZ CON JACINTO LARA",
+            momento=hora_deteccion,
+            id_cantidad=vehiculo.cantidad
+            )
+
             session.add(nueva_entrada)
-            session.commit()
+            session.commit() 
 
 async def resize_frame_to_bytes(frame: cv2.Mat):
     # Obtén las dimensiones originales del frame
