@@ -1,13 +1,9 @@
 import cv2
 import os
 import json
-os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
-import openvino as ov
 from typing import List
 from pydantic import BaseModel
 from datetime import datetime
-from camaras import *
-from camaras.init import *
 from db.coneccion import *
 from db.models import *
 import pandas as pd
@@ -22,10 +18,10 @@ from starlette.requests import Request
 import asyncio
 from vidgear.gears import CamGear
 from typing import Callable
+from sqlalchemy.exc import IntegrityError
 import numpy as np 
 if not os.path.exists('plates'):
        os.makedirs('plates')
-os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 import time
 from alpr.alpr import ALPR
 from argparse import ArgumentParser
@@ -34,7 +30,7 @@ from services.video_capture import VideoCapture
 import logging
 from timeit import default_timer as timer
 from datetime import datetime
-fechaActual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 # from watchdog.observers import Observer
@@ -239,7 +235,8 @@ async def save_plate(plate_foto: np.ndarray, alpr: ALPR, count: int):
             ip, puerto = obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion)
             print(f"IP: {ip}, Puerto: {puerto}")
             camara_info = f"{ip}:{puerto}"
-        
+           
+           
             respuesta_api = {
                 "data": 
                     [{"plates": plate_number,
@@ -250,28 +247,42 @@ async def save_plate(plate_foto: np.ndarray, alpr: ALPR, count: int):
             }
             
             
+           
             vehiculo = session.query(Vehiculo).filter_by(cantidad=str(len(extra_data))).first()
             if not vehiculo:
                 vehiculo = Vehiculo(cantidad=str(len(extra_data)))
                 session.add(vehiculo)
                 session.commit()
-                
+
             nueva_entrada = PlateCamera(
-            placa=plate_number,
-            camara=camara_info,
-            interseccion="AVENIDA RAFAEL GONZALEZ CON JACINTO LARA",
-            momento=hora_deteccion,
-            id_cantidad=vehiculo.cantidad
+                placa=plate_number,
+                camara=camara_info,
+                interseccion="AVENIDA RAFAEL GONZALEZ CON JACINTO LARA",
+                momento=hora_deteccion,
+                id_cantidad=vehiculo.cantidad
             )
 
-            session.add(nueva_entrada)
-            session.commit() 
+            try:
+                session.add(nueva_entrada)
+                session.commit()
+            except IntegrityError:
+                session.rollback()
+                
+                # Actualizar el registro existente
+                session.query(PlateCamera) \
+                    .filter(PlateCamera.placa == plate_number) \
+                    .update({
+                        PlateCamera.camara: camara_info,
+                        PlateCamera.momento: hora_deteccion
+                    })
+                session.commit()
+
+          
 
 async def resize_frame_to_bytes(frame: cv2.Mat):
-    # Obtén las dimensiones originales del frame
+    
     height, width, _ = frame.shape
 
-    # Define las nuevas dimensiones aquí. Por ejemplo, para reducir a la mitad:
     new_width = width // 2
     new_height = height // 2
 
@@ -430,35 +441,31 @@ async def get_ocr_results():
 
 @app.get("/capture")
 def capture_image():
-    output_directory = './capturas'  # Ruta de salida donde se guardarán las capturas  # Ruta de salida donde se guardarán las capturas
-    capture_filename = 'latest_capture.jpg'  # Nombre del archivo de la captura más reciente
-    # Verificar si ya existe una captura
+    output_directory = './capturas' 
+    capture_filename = 'latest_capture.jpg' 
+   
     latest_capture_path = os.path.join(output_directory, capture_filename)
     if os.path.exists(latest_capture_path):
         return FileResponse(latest_capture_path, media_type='image/jpeg')
     
     cap = cv2.VideoCapture(stream)
     
-    # Abrir la cámara IP usando la URL proporcionada
-
     if not cap.isOpened():
         raise HTTPException(status_code=500, detail="No se pudo abrir la cámara IP")
 
-    # Leer un frame de la cámara
+   
     ret, frame = cap.read()
 
     if not ret:
         raise HTTPException(status_code=500, detail="No se pudo capturar una imagen")
 
-    # Guardar la imagen en disco en formato JPEG con calidad reducida
-    quality = 50  # Ajusta la calidad entre 0 y 100 (menor valor, menor calidad y tamaño)
+    
+    quality = 50 
     success = cv2.imwrite(latest_capture_path, frame, [cv2.IMWRITE_JPEG_QUALITY, quality])
     if not success:
         raise HTTPException(status_code=500, detail="Error al guardar la imagen")
 
-    # Liberar la cámara
+    
     cap.release()
 
     return FileResponse(latest_capture_path, media_type='image/jpeg')
-
-
