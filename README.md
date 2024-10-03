@@ -1,13 +1,20 @@
 # Convalpr_Vit
 
 #Aplicacion de Api con FastAPI para detectar placas
+#Documentacion
 
-#Video de prueba en assets/sample.mp4
-#Ruta del Video de Prueba
-https://drive.google.com/file/d/1K_29oQHqrTK23-KP8h5mbsKztkDBIt0m/view?usp=sharing
+#En caso de que no se pueda leer el Modelo y la Conexion a la bd
+
+    # Aplicar esto a la funcion principal del procesamiento
+        #async def gen_frames(cfg):
+        print('Configuracion:',cfg);
+        global extra_data
+    if 'modelo' not in cfg or 'db' not in cfg:
+        raise ValueError("El archivo de configuración no contiene 'modelo' o 'db'")
+    alpr = ALPR(cfg['modelo'], cfg['db'])
 
 
-#Documentacion 
+
 #En el Siguiente Fragmento de Codigo se Obtuvieron los recortes de las placas detetactas
 #de la funcion generadora dentro de modulo ocr.py
 
@@ -28,7 +35,7 @@ https://drive.google.com/file/d/1K_29oQHqrTK23-KP8h5mbsKztkDBIt0m/view?usp=shari
         #     try:
         #         os.remove(frame_name)
         #         print('hora')
-        #     except FileNotFoundError:    
+        #     except FileNotFoundError:
         #         print('El archivo no se encontro')
 
 #En el Modulo global ocr quedo aparte debido a que se hisieron unas pruebas para obtener el ocr del
@@ -50,10 +57,10 @@ https://drive.google.com/file/d/1K_29oQHqrTK23-KP8h5mbsKztkDBIt0m/view?usp=shari
         #if filename.endswith(".jpg"):  # Add more conditions if you have different file types
             # Construct full file path
             #filepath = os.path.join(directory, filename)
-            
+
             # Read the image
             #image = cv2.imread(filepath)
-            
+
 
     #result = reader.readtext(image, paragraph=False)
     #Supongamos que 'resultados' es una lista de predicciones
@@ -62,7 +69,7 @@ https://drive.google.com/file/d/1K_29oQHqrTK23-KP8h5mbsKztkDBIt0m/view?usp=shari
 
     #for res in result:
 
-        #texto_reconocido = res[1]  
+        #texto_reconocido = res[1]
 
     #print("patente: ",texto_reconocido)
 

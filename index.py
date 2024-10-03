@@ -19,13 +19,14 @@ import asyncio
 from vidgear.gears import CamGear
 from typing import Callable
 from sqlalchemy.exc import IntegrityError
-import numpy as np 
+import numpy as np
 if not os.path.exists('plates'):
        os.makedirs('plates')
 import time
 from alpr.alpr import ALPR
 from argparse import ArgumentParser
-import yaml
+
+from config import config
 from services.video_capture import VideoCapture
 import logging
 from timeit import default_timer as timer
@@ -37,41 +38,11 @@ from fastapi.staticfiles import StaticFiles
 # from watchdog.events import FileSystemEventHandler
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException, Query
-import tempfile
+
 from PIL import Image
 from ultralytics import YOLO
 
 model = YOLO('yolov8s.pt')
-
-ruta_configuracion= "config.yaml"
-
-def obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion):
-    with open(ruta_configuracion, 'r') as f:
-        config = yaml.safe_load(f)
-        fuente = config.get('video', {}).get('fuente', None)
-        if fuente:
-            # Verificar si la fuente es una URL RTSP
-            if fuente.startswith('rtsp://'):
-                # Extraer la parte de la URL que contiene la IP y el puerto
-                inicio_ip = fuente.find('@') + 1
-                final_ip = fuente.find(':', inicio_ip)
-                ip_camara = fuente[inicio_ip:final_ip]
-                # Extraer el puerto de la URL RTSP
-                inicio_puerto = final_ip + 1
-                final_puerto = fuente.find('/', inicio_puerto) if '/' in fuente[inicio_puerto:] else len(fuente)
-                puerto_camara = fuente[inicio_puerto:final_puerto]
-                
-                return ip_camara, puerto_camara
-            else:
-                raise ValueError("La fuente no es una URL RTSP válida.")
-        else:
-            raise ValueError("La fuente no está especificada en el archivo de configuración.")
-
-
-ip, puerto = obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion)
-print(f"IP: {ip}, Puerto: {puerto}")
-        
-
 
 classnames  = []
 with open('coco.txt','r') as f:
@@ -83,39 +54,71 @@ line = [50, 550, 3900, 550]
 counter = []
 
 
+def obtener_ip_y_puerto_camara_desde_configuracion():
+    fuente = config.get('video', {}).get('fuente', None)
+    if fuente:
+        # Verificar si la fuente es una URL RTSP
+        if fuente.startswith('rtsp://'):
+            # Extraer la parte de la URL que contiene la IP y el puerto
+            inicio_ip = fuente.find('@') + 1
+            final_ip = fuente.find(':', inicio_ip)
+            ip_camara = fuente[inicio_ip:final_ip]
 
-def get_plate_cameras(pag: int = 0, limit: int = 10):
-    # Crear una sesión
-    db = SessionLocal()
-    try:
-        offset = pag * limit
-        # Realizar la consulta y devolver los resultados
-        return db.query(PlateCamera).offset(offset).limit(limit).all()
-    finally:
-        # Cerrar la sesión
-        db.close()
-        
-def get_total_plates():
-    db = SessionLocal()
-    try:
-        return db.query(PlateCamera).count();
-    finally:
-        db.close()
-        
-def get_last_plate_numbers():
-    db = SessionLocal()
-    try:
-       
-        plate_numbers = db.query(PlateCamera.placa).order_by(desc(PlateCamera.id)).limit(5).all()
-        
-        print (plate_numbers)
-        
-        return [plate_number[0] for plate_number in plate_numbers]
-    
+            # Extraer el puerto de la URL RTSP
+            inicio_puerto = final_ip + 1
+            final_puerto = fuente.find('/', inicio_puerto) if '/' in fuente[inicio_puerto:] else len(fuente)
+            puerto_camara = fuente[inicio_puerto:final_puerto]
 
-    finally:
-        db.close()
-        
+            return ip_camara, puerto_camara
+        else:
+            raise ValueError("La fuente no es una URL RTSP válida.")
+    else:
+        raise ValueError("La fuente no está especificada en la configuración.")
+
+# Usar la función para obtener IP y puerto
+ip, puerto = obtener_ip_y_puerto_camara_desde_configuracion()
+camara_info = f"{ip}:{puerto}"
+
+print(f"IP: {ip}, Puerto: {puerto}")
+
+
+
+
+
+
+
+# def get_plate_cameras(pag: int = 0, limit: int = 10):
+#     # Crear una sesión
+#     db = SessionLocal()
+#     try:
+#         offset = pag * limit
+#         # Realizar la consulta y devolver los resultados
+#         return db.query(PlateCamera).offset(offset).limit(limit).all()
+#     finally:
+#         # Cerrar la sesión
+#         db.close()
+
+# def get_total_plates():
+#     db = SessionLocal()
+#     try:
+#         return db.query(PlateCamera).count();
+#     finally:
+#         db.close()
+
+# def get_last_plate_numbers():
+#     db = SessionLocal()
+#     try:
+
+#         plate_numbers = db.query(PlateCamera.placa).order_by(desc(PlateCamera.id)).limit(5).all()
+
+#         print (plate_numbers)
+
+#         return [plate_number[0] for plate_number in plate_numbers]
+
+
+#     finally:
+#         db.close()
+
 
 arrayReconocidos = []
 
@@ -146,46 +149,46 @@ def seend_vehiculesInArea():
 prueba_vehiculos=[]
 
 
-@app.get("/plate_cameras/")
-def read_plate_cameras(pag: int = 0, limit: int = 10):
-    cameras = get_plate_cameras(pag,limit)
-    total = get_total_plates()
-    pages = total % limit
-    return {
-        'total': total,
-        'pages': pages,
-        'data': cameras,
-    }
+# @app.get("/plate_cameras/")
+# def read_plate_cameras(pag: int = 0, limit: int = 10):
+#     cameras = get_plate_cameras(pag,limit)
+#     total = get_total_plates()
+#     pages = total % limit
+#     return {
+#         'total': total,
+#         'pages': pages,
+#         'data': cameras,
+#     }
 
-@app.get("/last_plate/")
-def read_last_plate_numbers():
-    plate_numbers = get_last_plate_numbers()
-    return plate_numbers
-
-
+# @app.get("/last_plate/")
+# def read_last_plate_numbers():
+#     plate_numbers = get_last_plate_numbers()
+#     return plate_numbers
 
 
-@app.get("/placas")
-def get_images(page: int = Query(1, gt=0), page_size: int = Query(10, gt=0, le=100)):
-    # Calcular el índice de inicio y fin para la paginación
-    start_index = (page - 1) * page_size
-    end_index = start_index + page_size
 
-    # Crear una sesión
-    db = SessionLocal()
 
-    # Consultar todas las imágenes almacenadas en la base de datos, ordenadas por ID en orden descendente
-    images = db.query(Image).order_by(desc(Image.id)).offset(start_index).limit(page_size).all()
+# @app.get("/placas")
+# def get_images(page: int = Query(1, gt=0), page_size: int = Query(10, gt=0, le=100)):
+#     # Calcular el índice de inicio y fin para la paginación
+#     start_index = (page - 1) * page_size
+#     end_index = start_index + page_size
 
-    # Cerrar la sesión
-    db.close()
+#     # Crear una sesión
+#     db = SessionLocal()
 
-    # Si no se encontraron imágenes en la página especificada, lanzar una excepción 404
-    if not images:
-        raise HTTPException(status_code=404, detail="No se encontraron imágenes en la página especificada")
+#     # Consultar todas las imágenes almacenadas en la base de datos, ordenadas por ID en orden descendente
+#     images = db.query(Image).order_by(desc(Image.id)).offset(start_index).limit(page_size).all()
 
-    # Devolver las imágenes como respuesta
-    return images
+#     # Cerrar la sesión
+#     db.close()
+
+    # # Si no se encontraron imágenes en la página especificada, lanzar una excepción 404
+    # if not images:
+    #     raise HTTPException(status_code=404, detail="No se encontraron imágenes en la página especificada")
+
+    # # Devolver las imágenes como respuesta
+    # return images
 
 
 @app.get("/ultimo")
@@ -224,30 +227,23 @@ async def save_plate(plate_foto: np.ndarray, alpr: ALPR, count: int):
         new_frame = plate_foto.copy()[y1:y2, x1:x2]
         # image = cv2.imencode('.jpg', new_frame)[1].tobytes()
         # cv2.imshow("frame", new_frame)
-        
+
         global respuesta_api
         plate_number = alpr.plate
-        
+
         if len(plate_number) >= 6:  # Validación de longitud mínima de placa
-            ip_camera = obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion)[0]
-            
-            
-            ip, puerto = obtener_ip_y_puerto_camara_desde_configuracion(ruta_configuracion)
-            print(f"IP: {ip}, Puerto: {puerto}")
-            camara_info = f"{ip}:{puerto}"
-           
-           
+
             respuesta_api = {
-                "data": 
+                "data":
                     [{"plates": plate_number,
                     "camara":camara_info,
                     "vehiculos":len(extra_data),
-                    "moment": hora_deteccion.strftime("%Y-%m-%d %H:%M:%S") 
-                    }] 
+                    "moment": hora_deteccion.strftime("%Y-%m-%d %H:%M:%S")
+                    }]
             }
-            
-            
-           
+
+
+
             vehiculo = session.query(Vehiculo).filter_by(cantidad=str(len(extra_data))).first()
             if not vehiculo:
                 vehiculo = Vehiculo(cantidad=str(len(extra_data)))
@@ -267,7 +263,7 @@ async def save_plate(plate_foto: np.ndarray, alpr: ALPR, count: int):
                 session.commit()
             except IntegrityError:
                 session.rollback()
-                
+
                 # Actualizar el registro existente
                 session.query(PlateCamera) \
                     .filter(PlateCamera.placa == plate_number) \
@@ -277,10 +273,10 @@ async def save_plate(plate_foto: np.ndarray, alpr: ALPR, count: int):
                     })
                 session.commit()
 
-          
+
 
 async def resize_frame_to_bytes(frame: cv2.Mat):
-    
+
     height, width, _ = frame.shape
 
     new_width = width // 2
@@ -294,7 +290,9 @@ async def resize_frame_to_bytes(frame: cv2.Mat):
 
 
 async def gen_frames(cfg):
+
     global extra_data
+  
     alpr = ALPR(cfg['modelo'], cfg['db'])
     video_path = cfg['video']['fuente']
     CamGear  = VideoCapture(video_path)
@@ -312,7 +310,7 @@ async def gen_frames(cfg):
             detecciones=[]
             detections = np.empty((0,5))
             result2=poligonDeInteres(frame)
-            
+
             result = model(result2,stream=1)
             for info in result:
                 boxes = info.boxes
@@ -329,23 +327,23 @@ async def gen_frames(cfg):
                         x1,y1,x2,y2 = int(x1),int(y1),int(x2),int(y2)
                         new_detections = np.array([x1,y1,x2,y2,conf])
                         detections = np.vstack((detections,new_detections))
-                       
-                      
+
+
                     plate_foto, total_time = alpr.mostrar_predicts(frame,result2)
-                   
+
                     track_result = tracker.update(detections)
                     cv2.line(frame,(line[0],line[1]),(line[2],line[3]),(0,255,255),7)
                     # Verificar si la placa ya está en el diccionario
                     if alpr.plate in placas:
-                        
+
                         # Si la placa ya está en el diccionario, no necesitamos hacer nada más
                         pass
                     else:
 
                         if len(placas) == 100:
                             placas.pop(0)
-                            placas.append(alpr.plate)  
-                           
+                            placas.append(alpr.plate)
+
                 for results in track_result:
                     x1,y1,x2,y2,id = results
                     x1, y1, x2, y2, id = int(x1), int(y1), int(x2), int(y2),int(id)
@@ -365,11 +363,11 @@ async def gen_frames(cfg):
                 cvzone.putTextRect(frame,f'Total Vehicles ={len(counter)}',[290,34],thickness=4,scale=2.3,border=2)
                 cvzone.putTextRect(frame,f'Vehiculos en area ={len(detecciones)}',[290,114],thickness=4,scale=2.3,border=2)
                 extra_data=detecciones
-                
+
             # Función para guardar las placas en la base de datos
             asyncio.ensure_future(save_plate(plate_foto, alpr, count))
-        
-          
+
+
             yield (b'--frame\r\n'b'Content-Type: image/jpeg\r\n\r\n' + (await resize_frame_to_bytes(frame)) + b'\r\n')
 
         except asyncio.CancelledError:
@@ -387,36 +385,36 @@ if __name__ == '__main__':
 
     try:
         parser = ArgumentParser()
-        parser.add_argument("--cfg", dest="cfg_file", help="Path del archivo de config, \
-                            default: ./config.yaml", default='config.yaml')
+
+    # Opción para el modo demo
         parser.add_argument("--demo", dest="demo",
-                            action='store_true', help="En vez de guardar las patentes, mostrar las predicciones")
+                        action='store_true', help="En vez de guardar las patentes, mostrar las predicciones")
 
         args = parser.parse_args()
-        with open(args.cfg_file, 'r') as stream:
-            try:
-                cfg = yaml.safe_load(stream)
-            except yaml.YAMLError as exc:
-                logger.exception(exc)
-        gen_frames(cfg, args.demo, args.bench)
+
+    # Ya no necesitas cargar un archivo YAML
+        cfg = config  # Usamos directamente el diccionario del archivo config.py
+
+    # Llamada a la función gen_frames con cfg
+        gen_frames(cfg, args.demo)
     except Exception as e:
         logger.exception(e)
 
 
 
-
 @app.get("/video_feed/")
 async def video_feed():
-
     try:
-        with open(r'config.yaml', 'r') as stream:
-            cfg = yaml.safe_load(stream)
-        
+        # Extraer la configuración directamente desde el archivo config.py
+        cfg = config
+        # Usar la configuración para la transmisión de video
         return StreamingResponse(gen_frames(cfg), media_type="multipart/x-mixed-replace;boundary=frame")
 
     except Exception as e:
+        # Manejo de errores
         error_message = {"Cámara no encontrada": str(e)}
-    return error_message
+        return error_message
+
 
 
 @app.get("/ocr_results")
@@ -439,33 +437,3 @@ async def get_ocr_results():
     return {"message": "Datos recibidos", "data": datos}
 
 
-@app.get("/capture")
-def capture_image():
-    output_directory = './capturas' 
-    capture_filename = 'latest_capture.jpg' 
-   
-    latest_capture_path = os.path.join(output_directory, capture_filename)
-    if os.path.exists(latest_capture_path):
-        return FileResponse(latest_capture_path, media_type='image/jpeg')
-    
-    cap = cv2.VideoCapture(stream)
-    
-    if not cap.isOpened():
-        raise HTTPException(status_code=500, detail="No se pudo abrir la cámara IP")
-
-   
-    ret, frame = cap.read()
-
-    if not ret:
-        raise HTTPException(status_code=500, detail="No se pudo capturar una imagen")
-
-    
-    quality = 50 
-    success = cv2.imwrite(latest_capture_path, frame, [cv2.IMWRITE_JPEG_QUALITY, quality])
-    if not success:
-        raise HTTPException(status_code=500, detail="Error al guardar la imagen")
-
-    
-    cap.release()
-
-    return FileResponse(latest_capture_path, media_type='image/jpeg')

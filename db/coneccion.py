@@ -8,7 +8,7 @@ from sqlalchemy import desc, asc
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.declarative import declarative_base
 
-engine = create_engine('postgresql://postgres:password@localhost/api')
+engine = create_engine('postgresql://postgres:123456@192.168.7.246/procesamiento_pruebas')
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()

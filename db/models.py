@@ -3,11 +3,11 @@ from datetime import datetime
 from db.coneccion import Base
 from sqlalchemy.orm import relationship
 
-# Definir los registros de las placas
+# # Definir los registros de las placas
 class PlateCamera(Base):
     __tablename__ = 'registros'
     placa  = Column(String, primary_key=True, index=True, nullable=False, unique=True)
-    camara = Column(String)    
+    camara = Column(String)
     interseccion = Column(String)
     momento = Column(DateTime, default=datetime.now)
     id_cantidad = Column(String, ForeignKey('vehiculos.cantidad'))
@@ -16,10 +16,10 @@ class PlateCamera(Base):
 
 class Vehiculo(Base):
     __tablename__ = 'vehiculos'
-    cantidad = Column(String, primary_key=True, index=True)    
+    cantidad = Column(String, primary_key=True, index=True)
     momento = Column(DateTime, default=datetime.now)
-    
-# Definir la tabla de coordenadas
+
+# # Definir la tabla de coordenadas
 class Coordenada(Base):
     __tablename__ = 'coordenadas'
     id = Column(Integer, primary_key=True)
@@ -30,8 +30,8 @@ class Coordenada(Base):
     linea1 = Column(String)
     linea2 = Column(String)
     create_at = Column(DateTime)
-    
-    
+
+
 class Image(Base):
     __tablename__ = "images"
     id = Column(Integer, primary_key=True, index=True)
