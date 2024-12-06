@@ -1,9 +1,9 @@
 Convalpr_Vit
-
-#Aplicacion de Api con FastAPI para detectar placas
+Aplicacion de Api con FastAPI para detectar placas
 #Documentacion
 ![22](https://github.com/user-attachments/assets/87e5bbad-8ec9-4ef5-bc76-aaa5bab15063)
 
+![Captura de pantalla 2024-12-06 124128](https://github.com/user-attachments/assets/01db0edd-b359-45f4-adc4-44ecf6585e49)
 
 
 #En caso de que no se pueda leer el Modelo y la Conexion a la bd
