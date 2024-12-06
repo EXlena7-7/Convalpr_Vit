@@ -1,4 +1,4 @@
-# Convalpr_Vit  /Aplicacion de Api con FastAPI para detectar placas
+# Convalpr_Vit  /Aplicacion de FastAPI para detectar placas y trakeo vehicular
 
 
 
