@@ -14,13 +14,11 @@ class RegistroDates(BaseModel):
 
 class RegistroBaseResponse(BaseModel):
     id: int
-    # camara: int
     camara: str
     placa: str
     interseccion: str
-    # imagen: str
     momento: datetime
-    # fecha: datetime
+
 
 
 class RegistroResponse(BaseModel):
